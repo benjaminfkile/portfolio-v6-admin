@@ -34,6 +34,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import PublishIcon from '@mui/icons-material/Publish';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import type { Block, Post } from '../types/content';
 import {
   ConflictError,
@@ -238,6 +239,14 @@ export default function PostEditorPage() {
         </Stack>
 
         <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            startIcon={<VisibilityIcon />}
+            onClick={() => navigate(`/posts/${post.id}/preview`)}
+            disabled={saving || publishing}
+          >
+            Preview
+          </Button>
           <Button
             variant="contained"
             startIcon={<SaveIcon />}
