@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import SectionsPage from './pages/SectionsPage';
 import PostsPage from './pages/PostsPage';
 import PostEditorPage from './pages/PostEditorPage';
+import PostPreviewPage from './pages/PostPreviewPage';
 import MediaPage from './pages/MediaPage';
 import VersionsPage from './pages/VersionsPage';
 import PreviewPage from './pages/PreviewPage';
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/sections" element={<SectionsPage />} />
             <Route path="/posts" element={<PostsPage />} />
             <Route path="/posts/:id" element={<PostEditorPage />} />
+            <Route path="/posts/:id/preview" element={<PostPreviewPage />} />
             <Route path="/media" element={<MediaPage />} />
             <Route path="/versions" element={<VersionsPage />} />
             <Route path="/preview" element={<PreviewPage />} />

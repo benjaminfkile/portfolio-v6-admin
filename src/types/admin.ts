@@ -34,3 +34,14 @@ export interface AdminSection {
   items: AdminSectionItem[];
   updated_at: string;
 }
+
+/**
+ * One published snapshot in the version history (§4.2 `GET /api/admin/versions`). Each
+ * `POST /api/admin/publish` (and each restore) appends one of these; `version` is the
+ * monotonically increasing snapshot number, `published_by` the admin who cut it.
+ */
+export interface Version {
+  version: number;
+  published_at: string;
+  published_by: string;
+}
