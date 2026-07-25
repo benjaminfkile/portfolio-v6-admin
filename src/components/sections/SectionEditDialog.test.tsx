@@ -1,0 +1,96 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import SectionEditDialog from './SectionEditDialog';
+import ItemEditDialog from './ItemEditDialog';
+import { SECTION_TYPE_LIST, getSectionTypeDef } from '../../lib/sectionRegistry';
+import type { AdminSection } from '../../types/admin';
+import type { SectionType } from '../../types/content';
+
+function makeSection(type: SectionType): AdminSection {
+  return {
+    id: 's1',
+    type,
+    position: 0,
+    is_hidden: false,
+    data: {},
+    items: [],
+    updated_at: '2026-01-01T00:00:00Z',
+  };
+}
+
+describe('SectionEditDialog — renders the right fields per section type (§3.4)', () => {
+  it.each(SECTION_TYPE_LIST)('renders every registry field for "$type"', (def) => {
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection(def.type)}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // The dialog title names the type.
+    expect(screen.getByText(`Edit ${def.label}`)).toBeInTheDocument();
+
+    // Each field in the registry produces a labelled control. (Outlined MUI fields
+    // render their label text twice — once as the <label>, once as the fieldset
+    // <legend> — so assert on presence rather than a single match.)
+    for (const field of def.fields) {
+      expect(screen.getAllByText(field.label).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('SectionEditDialog — save gating', () => {
+  it('disables Save while a required field is empty and enables it once filled', () => {
+    const onSave = vi.fn();
+    // hero requires `title`; start empty → Save disabled.
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection('hero')}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('shows a saving state on the Save button', () => {
+    render(
+      <SectionEditDialog
+        open
+        section={{ ...makeSection('hero'), data: { title: 'Hi' } }}
+        saving
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /saving/i })).toBeDisabled();
+  });
+});
+
+describe('ItemEditDialog — renders item fields for item-bearing types (§3.4)', () => {
+  it('renders portfolio item fields including the Links editor and a media picker', () => {
+    const def = getSectionTypeDef('portfolio');
+    render(
+      <ItemEditDialog
+        open
+        title="Add project"
+        fields={def.itemFields!}
+        initialData={{ ...def.defaultItemData }}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Description')).toBeInTheDocument();
+    expect(screen.getByText('Links')).toBeInTheDocument();
+    expect(screen.getByText('Tech icons')).toBeInTheDocument();
+    // The media field is a read-only placeholder until task #446.
+    expect(screen.getByText(/Media picker arrives with the media library/i)).toBeInTheDocument();
+  });
+});
