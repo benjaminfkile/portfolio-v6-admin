@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-ssr
+*.local
+coverage
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Env files (only the example is committed)
+.env
+.env.*
+!.env.example

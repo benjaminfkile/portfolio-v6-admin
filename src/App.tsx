@@ -1,0 +1,32 @@
+import { Navigate, Route, Routes } from 'react-router-dom';
+import InterceptorSetup from './components/InterceptorSetup';
+import ProtectedRoute from './components/ProtectedRoute';
+import AppShell from './components/AppShell';
+import LoginPage from './pages/LoginPage';
+import SectionsPage from './pages/SectionsPage';
+import PostsPage from './pages/PostsPage';
+import MediaPage from './pages/MediaPage';
+import VersionsPage from './pages/VersionsPage';
+import PreviewPage from './pages/PreviewPage';
+
+export default function App() {
+  return (
+    <>
+      <InterceptorSetup />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppShell />}>
+            <Route index element={<Navigate to="/sections" replace />} />
+            <Route path="/sections" element={<SectionsPage />} />
+            <Route path="/posts" element={<PostsPage />} />
+            <Route path="/media" element={<MediaPage />} />
+            <Route path="/versions" element={<VersionsPage />} />
+            <Route path="/preview" element={<PreviewPage />} />
+          </Route>
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
+  );
+}
