@@ -1,26 +1,34 @@
 /**
- * Media-id field — a READ-ONLY picker placeholder (per task scope). The real media
- * library and picker land in sibling task #446; until then media_id fields render the
- * stored id (if any) and cannot be changed from here.
+ * Media-id field — opens the reusable {@link MediaPicker} (task #446) to browse or upload
+ * an asset and writes the chosen `media_id` back through `onChange`. The picker also yields
+ * alt text; for a freshly uploaded asset that alt is persisted on the `media_assets` row at
+ * upload time (§6.7), so accessible descriptions are captured right where media is chosen.
  *
- * INTEGRATION POINT: when #446 ships, replace the disabled control below with a button
- * that opens the media picker dialog and calls `onChange(selectedMediaId)`. The `onChange`
- * prop is already threaded through so the surrounding form needs no change — only this
- * component's body does.
+ * Styling is MUI theme + `sx` only (§14.4).
  */
-import { Box, Button, InputAdornment, TextField, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Box, Button, InputAdornment, Stack, TextField } from '@mui/material';
 import PermMediaIcon from '@mui/icons-material/PermMedia';
+import MediaPicker from '../media/MediaPicker';
 
 interface MediaIdFieldProps {
   label: string;
   value: string;
   required?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- wired for task #446
   onChange?: (mediaId: string) => void;
   helperText?: string;
 }
 
-export default function MediaIdField({ label, value, required, helperText }: MediaIdFieldProps) {
+export default function MediaIdField({
+  label,
+  value,
+  required,
+  onChange,
+  helperText,
+}: MediaIdFieldProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const showRequiredError = Boolean(required) && !value;
+
   return (
     <Box>
       <TextField
@@ -29,27 +37,39 @@ export default function MediaIdField({ label, value, required, helperText }: Med
         value={value || ''}
         fullWidth
         size="small"
+        error={showRequiredError}
+        helperText={helperText}
         slotProps={{
           input: {
             readOnly: true,
             startAdornment: (
               <InputAdornment position="start">
-                <PermMediaIcon fontSize="small" color="disabled" />
+                <PermMediaIcon fontSize="small" color={value ? 'primary' : 'disabled'} />
               </InputAdornment>
             ),
             endAdornment: (
-              <Button size="small" disabled>
-                Choose…
-              </Button>
+              <Stack direction="row" spacing={0.5}>
+                {value && onChange && (
+                  <Button size="small" color="inherit" onClick={() => onChange('')}>
+                    Clear
+                  </Button>
+                )}
+                <Button size="small" onClick={() => setPickerOpen(true)}>
+                  {value ? 'Change…' : 'Choose…'}
+                </Button>
+              </Stack>
             ),
           },
         }}
         placeholder="No media selected"
-        helperText={helperText}
       />
-      <Typography variant="caption" color="text.secondary">
-        Media picker arrives with the media library (task #446). Read-only for now.
-      </Typography>
+
+      <MediaPicker
+        open={pickerOpen}
+        selectedId={value || undefined}
+        onClose={() => setPickerOpen(false)}
+        onSelect={({ media_id }) => onChange?.(media_id)}
+      />
     </Box>
   );
 }

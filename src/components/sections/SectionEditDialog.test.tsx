@@ -90,7 +90,7 @@ describe('ItemEditDialog — renders item fields for item-bearing types (§3.4)'
     expect(screen.getByText('Description')).toBeInTheDocument();
     expect(screen.getByText('Links')).toBeInTheDocument();
     expect(screen.getByText('Tech icons')).toBeInTheDocument();
-    // The media field is a read-only placeholder until task #446.
-    expect(screen.getByText(/Media picker arrives with the media library/i)).toBeInTheDocument();
+    // The media field now opens the reusable MediaPicker (task #446): a "Choose…" button.
+    expect(screen.getByRole('button', { name: /choose/i })).toBeInTheDocument();
   });
 });
