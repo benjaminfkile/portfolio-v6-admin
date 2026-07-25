@@ -56,7 +56,8 @@ export default function CodeBlockEditor({ block, onChange }: CodeBlockEditorProp
         fullWidth
         value={block.code}
         onChange={(e) => onChange({ ...block, code: e.target.value })}
-        slotProps={{ htmlInput: { spellCheck: false, style: { fontFamily: 'monospace' } } }}
+        slotProps={{ htmlInput: { spellCheck: false } }}
+        sx={{ '& textarea': { fontFamily: 'monospace' } }}
       />
     </Stack>
   );

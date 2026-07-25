@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import apiClient from './apiClient';
-import { getVersions, restoreVersion } from './versionsApi';
+import { getVersions, publishSite, PublishValidationError, restoreVersion } from './versionsApi';
 import { getIdToken } from '../lib/cognitoClient';
 import type { Version } from '../types/admin';
 
@@ -31,5 +31,34 @@ describe('versionsApi (§4.2)', () => {
     mock.onPost('/api/admin/versions/2/restore').reply(200, ok({}));
     await restoreVersion(2);
     expect(mock.history.post[0].url).toBe('/api/admin/versions/2/restore');
+  });
+
+  it('publishSite POSTs to /api/admin/publish and returns the new version', async () => {
+    const created: Version = {
+      version: 3,
+      published_at: '2026-07-25T00:00:00Z',
+      published_by: 'ben@example.com',
+    };
+    mock.onPost('/api/admin/publish').reply(200, ok(created));
+    expect(await publishSite()).toEqual(created);
+    expect(mock.history.post[0].url).toBe('/api/admin/publish');
+  });
+
+  it('publishSite maps a 422 into PublishValidationError with the per-issue list (§3.9)', async () => {
+    mock.onPost('/api/admin/publish').reply(422, {
+      status: 'error',
+      error: true,
+      errorMsg: 'Working set failed validation.',
+      errors: ['hero: title is required', 'portfolio item 2: missing media'],
+    });
+    await expect(publishSite()).rejects.toMatchObject({
+      name: 'PublishValidationError',
+      issues: ['hero: title is required', 'portfolio item 2: missing media'],
+    });
+  });
+
+  it('publishSite rethrows a non-validation failure as a plain Error', async () => {
+    mock.onPost('/api/admin/publish').reply(500, { status: 'error', error: true });
+    await expect(publishSite()).rejects.not.toBeInstanceOf(PublishValidationError);
   });
 });
