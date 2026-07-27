@@ -30,10 +30,14 @@ const state: {
   authError: Error | null;
   session: FakeSession;
   currentUser: FakeCurrentUser | null;
+  challenge: 'newPasswordRequired' | 'totpRequired' | 'mfaSetup' | null;
+  totpSecret: string;
 } = {
   authError: null,
   session: makeSession('default-id-token'),
   currentUser: null,
+  challenge: null,
+  totpSecret: 'MOCKSECRET234567',
 };
 
 /** Reset all staged auth state — call in `beforeEach`. */
@@ -41,6 +45,20 @@ export function __reset(): void {
   state.authError = null;
   state.session = makeSession('default-id-token');
   state.currentUser = null;
+  state.challenge = null;
+  state.totpSecret = 'MOCKSECRET234567';
+}
+
+/**
+ * Stage the FIRST authenticateUser call to fire a challenge callback. The
+ * follow-up call (completeNewPasswordChallenge / sendMFACode /
+ * verifySoftwareToken) then honors the remaining staged state: a staged
+ * authError fails it, otherwise it succeeds with the staged session.
+ */
+export function __setChallenge(
+  challenge: 'newPasswordRequired' | 'totpRequired' | 'mfaSetup',
+): void {
+  state.challenge = challenge;
 }
 
 /** Stage the session `authenticateUser().onSuccess` resolves with. */
@@ -74,12 +92,56 @@ export const CognitoUserPool = vi.fn().mockImplementation(() => ({
   signUp: vi.fn(),
 }));
 
+interface AuthCallbacks {
+  onSuccess: (s: FakeSession) => void;
+  onFailure: (e: Error) => void;
+  newPasswordRequired?: (userAttributes: Record<string, string>, required: string[]) => void;
+  totpRequired?: (challengeName: string, params: Record<string, string>) => void;
+  mfaSetup?: (challengeName: string, params: Record<string, string>) => void;
+}
+
+/** Settle a follow-up step per remaining staged state (error wins, else session). */
+function settleStep(callbacks: Pick<AuthCallbacks, 'onSuccess' | 'onFailure'>): void {
+  if (state.authError) callbacks.onFailure(state.authError);
+  else callbacks.onSuccess(state.session);
+}
+
 export const CognitoUser = vi.fn().mockImplementation(() => ({
-  authenticateUser: vi.fn(
-    (_details: unknown, callbacks: { onSuccess: (s: FakeSession) => void; onFailure: (e: Error) => void }) => {
-      if (state.authError) callbacks.onFailure(state.authError);
-      else callbacks.onSuccess(state.session);
+  authenticateUser: vi.fn((_details: unknown, callbacks: AuthCallbacks) => {
+    if (state.challenge === 'newPasswordRequired' && callbacks.newPasswordRequired) {
+      state.challenge = null;
+      return callbacks.newPasswordRequired({ email: 'x@y.z' }, []);
+    }
+    if (state.challenge === 'totpRequired' && callbacks.totpRequired) {
+      state.challenge = null;
+      return callbacks.totpRequired('SOFTWARE_TOKEN_MFA', {});
+    }
+    if (state.challenge === 'mfaSetup' && callbacks.mfaSetup) {
+      state.challenge = null;
+      return callbacks.mfaSetup('MFA_SETUP', {});
+    }
+    settleStep(callbacks);
+  }),
+  completeNewPasswordChallenge: vi.fn(
+    (_newPassword: string, _attrs: unknown, callbacks: AuthCallbacks) => {
+      // A staged second challenge lets tests chain new-password -> TOTP setup.
+      if (state.challenge === 'mfaSetup' && callbacks.mfaSetup) {
+        state.challenge = null;
+        return callbacks.mfaSetup('MFA_SETUP', {});
+      }
+      settleStep(callbacks);
     },
+  ),
+  sendMFACode: vi.fn((_code: string, callbacks: AuthCallbacks, _mfaType?: string) =>
+    settleStep(callbacks),
+  ),
+  associateSoftwareToken: vi.fn(
+    (callbacks: { associateSecretCode: (secret: string) => void; onFailure: (e: Error) => void }) =>
+      callbacks.associateSecretCode(state.totpSecret),
+  ),
+  verifySoftwareToken: vi.fn(
+    (_code: string, _name: string, callbacks: { onSuccess: (s: FakeSession) => void; onFailure: (e: Error) => void }) =>
+      settleStep(callbacks),
   ),
   getSession: vi.fn((cb: (err: Error | null, session: FakeSession | null) => void) =>
     cb(null, state.session),

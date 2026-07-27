@@ -37,7 +37,7 @@ describe('LoginPage', () => {
   });
 
   test('submitting calls login with the entered credentials and navigates on success', async () => {
-    mockLogin.mockResolvedValue(undefined);
+    mockLogin.mockResolvedValue({ kind: 'success', idToken: 'jwt' });
     renderPage();
 
     await userEvent.type(screen.getByLabelText(/email/i), 'admin@benkile.com');

@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { signIn, signOut, getIdToken } from '../lib/cognitoClient';
+import { signIn, signOut, getIdToken, type SignInResult } from '../lib/cognitoClient';
 
 // Adapted from FileManager's AuthContext. Portfolio v6 has exactly one class of user and
 // no `users` table / `/me` endpoint (spec §5.3), so authentication state is derived
@@ -21,7 +21,12 @@ export interface AdminUser {
 interface AuthContextValue {
   currentUser: AdminUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /**
+   * Sign in. Resolves 'success' (user state is set) or a Cognito challenge
+   * (new password / TOTP) whose `complete()` continues the flow — challenge
+   * results are wrapped so a nested success also sets the user state (§5.1/§5.2).
+   */
+  login: (email: string, password: string) => Promise<SignInResult>;
   logout: () => void;
 }
 
@@ -80,8 +85,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const token = await signIn(email, password);
-    setCurrentUser(userFromToken(token, email));
+    // Wrap challenge continuations so that whenever the chain finally yields
+    // success — directly, or after new-password/TOTP steps — the user state is
+    // set here, keeping the page components free of auth-state bookkeeping.
+    const finish = (result: SignInResult): SignInResult => {
+      if (result.kind === 'success') {
+        setCurrentUser(userFromToken(result.idToken, email));
+        return result;
+      }
+      return {
+        ...result,
+        complete: async (value: string) => finish(await result.complete(value)),
+      };
+    };
+    return finish(await signIn(email, password));
   }, []);
 
   const logout = useCallback(() => {

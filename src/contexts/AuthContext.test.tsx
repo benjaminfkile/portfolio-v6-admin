@@ -72,7 +72,7 @@ describe('AuthContext', () => {
 
   test('login signs in via SRP and sets the current user', async () => {
     mockGetIdToken.mockResolvedValue(null);
-    mockSignIn.mockResolvedValue('jwt-token');
+    mockSignIn.mockResolvedValue({ kind: 'success', idToken: 'jwt-token' });
 
     render(
       <AuthProvider>

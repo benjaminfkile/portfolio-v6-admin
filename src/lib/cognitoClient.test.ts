@@ -13,6 +13,7 @@ const sdk = cognitoSdk as unknown as {
   __setAuthError: (error: Error | null) => void;
   __setSignedIn: (idToken?: string, valid?: boolean) => void;
   __setSessionError: (error: Error) => void;
+  __setChallenge: (c: 'newPasswordRequired' | 'totpRequired' | 'mfaSetup') => void;
 };
 
 beforeEach(() => {
@@ -22,7 +23,62 @@ beforeEach(() => {
 describe('cognitoClient', () => {
   it('signIn resolves the id token JWT on successful SRP auth', async () => {
     sdk.__setSession('id-token-123');
-    await expect(signIn('admin@benkile.com', 'correct-horse')).resolves.toBe('id-token-123');
+    await expect(signIn('admin@benkile.com', 'correct-horse')).resolves.toEqual({
+      kind: 'success',
+      idToken: 'id-token-123',
+    });
+  });
+
+  it('signIn surfaces NEW_PASSWORD_REQUIRED and completes to success (§5.1 admin-created users)', async () => {
+    sdk.__setChallenge('newPasswordRequired');
+    sdk.__setSession('post-challenge-token');
+
+    const first = await signIn('admin@benkile.com', 'temp-password');
+    expect(first.kind).toBe('newPasswordRequired');
+    if (first.kind !== 'newPasswordRequired') throw new Error('unreachable');
+
+    await expect(first.complete('New-Password-123!')).resolves.toEqual({
+      kind: 'success',
+      idToken: 'post-challenge-token',
+    });
+  });
+
+  it('rejects a weak new password with the Cognito error, not a crash', async () => {
+    sdk.__setChallenge('newPasswordRequired');
+    const first = await signIn('admin@benkile.com', 'temp-password');
+    if (first.kind !== 'newPasswordRequired') throw new Error('unreachable');
+
+    sdk.__setAuthError(new Error('Password does not conform to policy'));
+    await expect(first.complete('short')).rejects.toThrow('Password does not conform to policy');
+  });
+
+  it('signIn surfaces SOFTWARE_TOKEN_MFA and completes with a code', async () => {
+    sdk.__setChallenge('totpRequired');
+    sdk.__setSession('post-totp-token');
+
+    const first = await signIn('admin@benkile.com', 'password');
+    expect(first.kind).toBe('totpRequired');
+    if (first.kind !== 'totpRequired') throw new Error('unreachable');
+
+    await expect(first.complete('123456')).resolves.toEqual({
+      kind: 'success',
+      idToken: 'post-totp-token',
+    });
+  });
+
+  it('signIn surfaces MFA_SETUP with the shared secret and verifies to success (prod pool)', async () => {
+    sdk.__setChallenge('mfaSetup');
+    sdk.__setSession('post-setup-token');
+
+    const first = await signIn('admin@benkile.com', 'password');
+    expect(first.kind).toBe('totpSetupRequired');
+    if (first.kind !== 'totpSetupRequired') throw new Error('unreachable');
+    expect(first.secret).toBe('MOCKSECRET234567');
+
+    await expect(first.complete('654321')).resolves.toEqual({
+      kind: 'success',
+      idToken: 'post-setup-token',
+    });
   });
 
   it('signIn rejects when authentication fails', async () => {
