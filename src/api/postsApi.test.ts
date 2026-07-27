@@ -28,7 +28,7 @@ const ok = <T>(data: T) => ({ status: 'ok', error: false, data });
 
 describe('postsApi — reads and create', () => {
   it('getPosts unwraps the envelope', async () => {
-    mock.onGet('/api/admin/posts').reply(200, ok([{ id: 'p1', title: 'Hello' }]));
+    mock.onGet('/api/admin/posts').reply(200, ok({ posts: [{ id: 'p1', title: 'Hello' }] }));
     expect(await getPosts()).toEqual([{ id: 'p1', title: 'Hello' }]);
   });
 

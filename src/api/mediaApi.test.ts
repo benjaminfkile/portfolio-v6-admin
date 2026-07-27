@@ -145,7 +145,7 @@ describe('mediaApi — three-step upload (§6.7)', () => {
 
 describe('mediaApi — library reads, delete, sweep (§4.2, §6.9)', () => {
   it('getMedia unwraps the asset list', async () => {
-    api.onGet('/api/admin/media').reply(200, ok([{ id: 'm1' }, { id: 'm2' }]));
+    api.onGet('/api/admin/media').reply(200, ok({ assets: [{ id: 'm1' }, { id: 'm2' }] }));
     const assets = await getMedia();
     expect(assets).toHaveLength(2);
     expect(assets[0].id).toBe('m1');

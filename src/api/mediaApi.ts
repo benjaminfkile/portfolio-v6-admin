@@ -51,7 +51,7 @@ export class MediaUploadError extends Error {
 
 /** GET /api/admin/media — all assets, including orphan status and deletion timing (§4.2). */
 export async function getMedia(): Promise<MediaAsset[]> {
-  return unwrap<MediaAsset[]>(await apiClient.get('/api/admin/media'));
+  return unwrap<{ assets: MediaAsset[] }>(await apiClient.get('/api/admin/media')).assets;
 }
 
 // ---- Upload (§6.7) ---------------------------------------------------------

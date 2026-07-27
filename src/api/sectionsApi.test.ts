@@ -27,7 +27,7 @@ const ok = <T>(data: T) => ({ status: 'ok', error: false, data });
 
 describe('sectionsApi — reads and writes', () => {
   it('getSections unwraps the response envelope', async () => {
-    mock.onGet('/api/admin/sections').reply(200, ok([{ id: 's1', type: 'hero' }]));
+    mock.onGet('/api/admin/sections').reply(200, ok({ sections: [{ id: 's1', type: 'hero' }] }));
     const sections = await getSections();
     expect(sections).toEqual([{ id: 's1', type: 'hero' }]);
   });

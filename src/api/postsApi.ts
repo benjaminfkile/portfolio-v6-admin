@@ -81,7 +81,7 @@ export interface UpdatePostPayload {
 
 /** GET /api/admin/posts — all posts, drafts included (§4.2). */
 export async function getPosts(): Promise<Post[]> {
-  return unwrap<Post[]>(await apiClient.get('/api/admin/posts'));
+  return unwrap<{ posts: Post[] }>(await apiClient.get('/api/admin/posts')).posts;
 }
 
 /** GET /api/admin/posts/:id — one post with its `draft_body` (§4.2). */

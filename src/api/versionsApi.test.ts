@@ -23,7 +23,7 @@ const versions: Version[] = [
 
 describe('versionsApi (§4.2)', () => {
   it('getVersions unwraps the envelope', async () => {
-    mock.onGet('/api/admin/versions').reply(200, ok(versions));
+    mock.onGet('/api/admin/versions').reply(200, ok({ versions }));
     expect(await getVersions()).toEqual(versions);
   });
 

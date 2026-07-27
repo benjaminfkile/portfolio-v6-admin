@@ -52,7 +52,7 @@ export interface UpdatePayload {
 
 /** GET /api/admin/sections — the full working set, drafts included. */
 export async function getSections(): Promise<AdminSection[]> {
-  return unwrap<AdminSection[]>(await apiClient.get('/api/admin/sections'));
+  return unwrap<{ sections: AdminSection[] }>(await apiClient.get('/api/admin/sections')).sections;
 }
 
 /** POST /api/admin/sections — create a section of `type`. */

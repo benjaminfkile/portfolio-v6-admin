@@ -46,7 +46,7 @@ export class PublishValidationError extends Error {
 
 /** GET /api/admin/versions — the published version history (§4.2). */
 export async function getVersions(): Promise<Version[]> {
-  return unwrap<Version[]>(await apiClient.get('/api/admin/versions'));
+  return unwrap<{ versions: Version[] }>(await apiClient.get('/api/admin/versions')).versions;
 }
 
 /**
