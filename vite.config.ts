@@ -7,6 +7,13 @@ import react from '@vitejs/plugin-react';
 // mirroring what the gateway does in production, so CORS never enters the local path.
 export default defineConfig({
   plugins: [react()],
+  // amazon-cognito-identity-js (via its `buffer` dependency) references the
+  // Node global `global`, which CRA/webpack shims but Vite does not — without
+  // this the admin crashes at load with "global is not defined". Applies to
+  // both dev and production builds.
+  define: {
+    global: 'globalThis',
+  },
   server: {
     port: 5174,
     proxy: {
