@@ -114,13 +114,13 @@ export async function performUpload(
   file: File,
   opts: { alt?: string; onProgress?: (percent: number) => void } = {},
 ): Promise<MediaAsset> {
-  const { id, url, headers } = await requestUploadUrl({
+  const { id, upload_url, upload_headers } = await requestUploadUrl({
     filename: file.name,
     mime: file.type || 'application/octet-stream',
     size: file.size,
     alt: opts.alt,
   });
-  await uploadToS3(url, headers, file, opts.onProgress);
+  await uploadToS3(upload_url, upload_headers, file, opts.onProgress);
   return confirmUpload(id);
 }
 

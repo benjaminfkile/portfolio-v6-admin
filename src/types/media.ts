@@ -34,10 +34,14 @@ export interface MediaAsset {
 export interface UploadUrlResponse {
   /** The `media_assets` row id inserted with `confirmed_at = null`. */
   id: string;
+  /** The S3 object key (`media/{uuid}/{filename}`). */
+  s3_key: string;
   /** Presigned S3 PUT URL, 15-min TTL. */
-  url: string;
+  upload_url: string;
   /** Headers to send verbatim on the PUT — includes `x-amz-tagging`, `Content-Type`, `Cache-Control`. */
-  headers: Record<string, string>;
+  upload_headers: Record<string, string>;
+  /** Seconds until the presigned URL expires. */
+  expires_in: number;
 }
 
 /** `POST /api/admin/media/sweep` response — a summary of what the GC pass did (§6.9). */

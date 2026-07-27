@@ -36,7 +36,7 @@ function selectFile() {
 describe('UploadDialog', () => {
   it('drives the full upload and reports the confirmed asset', async () => {
     const user = userEvent.setup();
-    api.onPost('/api/admin/media/upload-url').reply(200, ok({ id: 'm1', url: URL, headers: HEADERS }));
+    api.onPost('/api/admin/media/upload-url').reply(200, ok({ id: 'm1', s3_key: 'media/u/f.png', upload_url: URL, upload_headers: HEADERS, expires_in: 900 }));
     s3.onPut(URL).reply(200);
     api.onPost('/api/admin/media/m1/confirm').reply(200, ok({
       id: 'm1', s3_key: 'media/u/pic.png', mime: 'image/png', bytes: 5,
@@ -55,7 +55,7 @@ describe('UploadDialog', () => {
 
   it('shows the tagging-mismatch hint when the PUT returns 403 (§6.7 gotcha)', async () => {
     const user = userEvent.setup();
-    api.onPost('/api/admin/media/upload-url').reply(200, ok({ id: 'm2', url: URL, headers: HEADERS }));
+    api.onPost('/api/admin/media/upload-url').reply(200, ok({ id: 'm2', s3_key: 'media/u/f.png', upload_url: URL, upload_headers: HEADERS, expires_in: 900 }));
     s3.onPut(URL).reply(403);
 
     render(<UploadDialog open onClose={() => {}} onUploaded={() => {}} />);

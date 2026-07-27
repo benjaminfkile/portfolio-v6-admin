@@ -51,8 +51,10 @@ describe('mediaApi — three-step upload (§6.7)', () => {
   it('runs request → tagged PUT → confirm in order with a byte-exact x-amz-tagging header', async () => {
     api.onPost('/api/admin/media/upload-url').reply(200, ok({
       id: 'm1',
-      url: PRESIGNED_URL,
-      headers: PINNED_HEADERS,
+      s3_key: 'media/uuid/photo.png',
+      upload_url: PRESIGNED_URL,
+      upload_headers: PINNED_HEADERS,
+      expires_in: 900,
     }));
     s3.onPut(PRESIGNED_URL).reply(200);
     api.onPost('/api/admin/media/m1/confirm').reply(200, ok({
@@ -98,8 +100,10 @@ describe('mediaApi — three-step upload (§6.7)', () => {
   it('surfaces a 403 on the PUT as a tagging-mismatch hint (§6.7 gotcha)', async () => {
     api.onPost('/api/admin/media/upload-url').reply(200, ok({
       id: 'm2',
-      url: PRESIGNED_URL,
-      headers: PINNED_HEADERS,
+      s3_key: 'media/uuid/photo.png',
+      upload_url: PRESIGNED_URL,
+      upload_headers: PINNED_HEADERS,
+      expires_in: 900,
     }));
     s3.onPut(PRESIGNED_URL).reply(403);
 
