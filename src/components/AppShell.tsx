@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
+import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
 import ArticleIcon from '@mui/icons-material/Article';
 import PermMediaIcon from '@mui/icons-material/PermMedia';
@@ -37,6 +38,7 @@ interface NavItem {
 
 // App shell navigation (spec §8.3). Sibling tasks build the CRUD out on these routes.
 const NAV_ITEMS: NavItem[] = [
+  { label: 'Pages', path: '/pages', icon: <AutoStoriesIcon /> },
   { label: 'Sections', path: '/sections', icon: <ViewQuiltIcon /> },
   { label: 'Posts', path: '/posts', icon: <ArticleIcon /> },
   { label: 'Media', path: '/media', icon: <PermMediaIcon /> },
