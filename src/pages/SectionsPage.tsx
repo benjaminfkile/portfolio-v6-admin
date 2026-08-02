@@ -9,7 +9,8 @@
  * re-validates the whole working set first (§3.9), so a validation refusal is surfaced as a
  * clear per-issue list rather than an opaque toast.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
   AlertTitle,
@@ -26,11 +27,13 @@ import {
   ListItemText,
   Snackbar,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PublishIcon from '@mui/icons-material/Publish';
-import type { AdminSection } from '../types/admin';
+import type { AdminSection, Page } from '../types/admin';
 import type { SectionType } from '../types/content';
 import { getSectionTypeDef } from '../lib/sectionRegistry';
 import {
@@ -41,6 +44,7 @@ import {
   reorderSections,
   updateSection,
 } from '../api/sectionsApi';
+import { getPages } from '../api/pagesApi';
 import { PublishValidationError, publishSite } from '../api/versionsApi';
 import SortableList, { type DragHandleProps } from '../components/dnd/SortableList';
 import SectionCard from '../components/sections/SectionCard';
@@ -49,10 +53,27 @@ import SectionEditDialog from '../components/sections/SectionEditDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ConflictDialog from '../components/ConflictDialog';
 
+/** Resolve the `?page=` param (id or slug) to a page, defaulting to home then the first page. */
+function resolveSelected(pages: Page[], param: string | null): Page | null {
+  return (
+    pages.find((p) => p.slug === param || p.id === param) ??
+    pages.find((p) => p.slug === 'home') ??
+    pages[0] ??
+    null
+  );
+}
+
 export default function SectionsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageParam = searchParams.get('page');
+
+  const [pages, setPages] = useState<Page[]>([]);
   const [sections, setSections] = useState<AdminSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+
+  const selectedPage = useMemo(() => resolveSelected(pages, pageParam), [pages, pageParam]);
+  const selectedPageId = selectedPage?.id ?? null;
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<AdminSection | null>(null);
@@ -65,33 +86,54 @@ export default function SectionsPage() {
   const [publishing, setPublishing] = useState(false);
   const [publishIssues, setPublishIssues] = useState<string[]>([]);
 
+  // Refetch just the sections for the currently selected page (used after every mutation).
   const refetch = useCallback(async () => {
-    const data = await getSections();
+    if (!selectedPageId) {
+      setSections([]);
+      return;
+    }
+    const data = await getSections(selectedPageId);
     setSections([...data].sort((a, b) => a.position - b.position));
-  }, []);
+  }, [selectedPageId]);
 
+  // Load the page list and the selected page's sections together. Re-runs when `?page=`
+  // changes (switching pages) so the working set always matches the URL context.
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError('');
     try {
-      await refetch();
+      const loadedPages = [...(await getPages())].sort((a, b) => a.nav_position - b.nav_position);
+      setPages(loadedPages);
+      const selected = resolveSelected(loadedPages, pageParam);
+      if (selected) {
+        const data = await getSections(selected.id);
+        setSections([...data].sort((a, b) => a.position - b.position));
+      } else {
+        setSections([]);
+      }
     } catch {
       setLoadError('Could not load the working set. Is the API reachable?');
     } finally {
       setLoading(false);
     }
-  }, [refetch]);
+  }, [pageParam]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  const handleSelectPage = (page: Page) => {
+    // Persist the selection in the URL (by slug) so a refresh keeps the page context.
+    setSearchParams({ page: page.slug }, { replace: true });
+  };
+
   const handleReorder = async (orderedIds: string[]) => {
+    if (!selectedPageId) return;
     // Optimistic: reflect the new order immediately, then persist the full array (§4.2).
     const byId = new Map(sections.map((s) => [s.id, s]));
     setSections(orderedIds.map((id) => byId.get(id)!).filter(Boolean));
     try {
-      await reorderSections(orderedIds);
+      await reorderSections(selectedPageId, orderedIds);
       await refetch();
     } catch {
       setToast('Could not save the new order.');
@@ -101,11 +143,31 @@ export default function SectionsPage() {
 
   const handleCreate = async (type: SectionType) => {
     setCreating(false);
+    if (!selectedPageId) return;
     try {
-      await createSection(type, { ...getSectionTypeDef(type).defaultData });
+      await createSection(type, { ...getSectionTypeDef(type).defaultData }, selectedPageId);
       await refetch();
     } catch {
       setToast('Could not create the section.');
+    }
+  };
+
+  const handleMove = async (section: AdminSection, targetPageId: string) => {
+    const target = pages.find((p) => p.id === targetPageId);
+    try {
+      await updateSection(section.id, {
+        page_id: targetPageId,
+        expected_updated_at: section.updated_at,
+      });
+      // The section left the current page — drop it from the list and confirm with a toast.
+      await refetch();
+      setToast(`Moved to "${target?.title ?? 'page'}".`);
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        setConflictOpen(true);
+      } else {
+        setToast('Could not move the section.');
+      }
     }
   };
 
@@ -197,7 +259,12 @@ export default function SectionsPage() {
           Sections
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={() => setCreating(true)}
+            disabled={!selectedPageId}
+          >
             Add section
           </Button>
           <Button
@@ -212,6 +279,25 @@ export default function SectionsPage() {
           </Button>
         </Stack>
       </Stack>
+
+      {pages.length > 0 && (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs
+            value={selectedPageId ?? false}
+            onChange={(_e, value: string) => {
+              const page = pages.find((p) => p.id === value);
+              if (page) handleSelectPage(page);
+            }}
+            variant="scrollable"
+            scrollButtons="auto"
+            aria-label="Select a page"
+          >
+            {pages.map((page) => (
+              <Tab key={page.id} value={page.id} label={page.title} />
+            ))}
+          </Tabs>
+        </Box>
+      )}
 
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
@@ -232,8 +318,17 @@ export default function SectionsPage() {
         </Alert>
       )}
 
-      {!loading && !loadError && sections.length === 0 && (
-        <Alert severity="info">No sections yet. Add one to start building the page.</Alert>
+      {!loading && !loadError && pages.length === 0 && (
+        <Alert severity="info">
+          No pages yet. Create a page first, then add sections to it.
+        </Alert>
+      )}
+
+      {!loading && !loadError && pages.length > 0 && sections.length === 0 && (
+        <Alert severity="info">
+          No sections on <strong>{selectedPage?.title}</strong> yet. Add one to start building this
+          page.
+        </Alert>
       )}
 
       {!loading && !loadError && sections.length > 0 && (
@@ -244,9 +339,11 @@ export default function SectionsPage() {
             <SectionCard
               section={section}
               handle={handle}
+              pages={pages}
               onEdit={() => setEditing(section)}
               onToggleHidden={() => void handleToggleHidden(section)}
               onDelete={() => setDeleting(section)}
+              onMove={(pageId) => void handleMove(section, pageId)}
               onChanged={refetch}
               onConflict={() => setConflictOpen(true)}
               onError={(msg) => setToast(msg)}

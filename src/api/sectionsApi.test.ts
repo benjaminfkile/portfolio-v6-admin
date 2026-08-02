@@ -32,10 +32,20 @@ describe('sectionsApi — reads and writes', () => {
     expect(sections).toEqual([{ id: 's1', type: 'hero' }]);
   });
 
-  it('createSection posts the type and default data', async () => {
+  it('getSections scopes the list to a page via ?page_id= (§3.10)', async () => {
+    mock.onGet('/api/admin/sections').reply(200, ok({ sections: [] }));
+    await getSections('p1');
+    expect(mock.history.get[0].params).toEqual({ page_id: 'p1' });
+  });
+
+  it('createSection posts the type, default data, and owning page_id (§3.10)', async () => {
     mock.onPost('/api/admin/sections').reply(200, ok({ id: 's9', type: 'about' }));
-    await createSection('about', { body: '' });
-    expect(JSON.parse(mock.history.post[0].data)).toEqual({ type: 'about', data: { body: '' } });
+    await createSection('about', { body: '' }, 'p1');
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({
+      type: 'about',
+      data: { body: '' },
+      page_id: 'p1',
+    });
   });
 
   it('deleteSection issues a DELETE to the row', async () => {
@@ -46,13 +56,13 @@ describe('sectionsApi — reads and writes', () => {
 });
 
 describe('sectionsApi — reorder emits the full ordered id array (§4.2)', () => {
-  it('reorderSections PUTs the complete { ids } array', async () => {
+  it('reorderSections PUTs the complete { page_id, ids } array scoped to the page (§3.10)', async () => {
     mock.onPut('/api/admin/sections/order').reply(200, ok({}));
-    await reorderSections(['c', 'a', 'b']);
+    await reorderSections('p1', ['c', 'a', 'b']);
 
     expect(mock.history.put).toHaveLength(1);
     expect(mock.history.put[0].url).toBe('/api/admin/sections/order');
-    expect(JSON.parse(mock.history.put[0].data)).toEqual({ ids: ['c', 'a', 'b'] });
+    expect(JSON.parse(mock.history.put[0].data)).toEqual({ page_id: 'p1', ids: ['c', 'a', 'b'] });
   });
 
   it('reorderItems PUTs the full ids array scoped to the section', async () => {
@@ -71,6 +81,15 @@ describe('sectionsApi — optimistic concurrency (§4.5)', () => {
     const body = JSON.parse(mock.history.patch[0].data);
     expect(body.expected_updated_at).toBe('2026-01-01T00:00:00Z');
     expect(body.data).toEqual({ title: 'Hi' });
+  });
+
+  it('updateSection moves a section by PATCHing page_id (§3.10)', async () => {
+    mock.onPatch('/api/admin/sections/s1').reply(200, ok({ id: 's1', page_id: 'p2' }));
+    await updateSection('s1', { page_id: 'p2', expected_updated_at: '2026-01-01T00:00:00Z' });
+
+    const body = JSON.parse(mock.history.patch[0].data);
+    expect(body.page_id).toBe('p2');
+    expect(body.expected_updated_at).toBe('2026-01-01T00:00:00Z');
   });
 
   it('updateSection throws ConflictError on 409', async () => {

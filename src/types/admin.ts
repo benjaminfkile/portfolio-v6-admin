@@ -24,9 +24,14 @@ export interface AdminSectionItem {
   updated_at: string;
 }
 
-/** One section of the editable working set, drafts included. */
+/**
+ * One section of the editable working set, drafts included. In v1.1 every section belongs to
+ * exactly one page (§3.10); `page_id` is the owning page and is required on create, filtered
+ * on list (`?page_id=`), and settable on PATCH to move the section to another page.
+ */
 export interface AdminSection {
   id: string;
+  page_id: string;
   type: SectionType;
   position: number;
   is_hidden: boolean;

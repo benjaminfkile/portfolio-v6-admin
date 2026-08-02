@@ -4,6 +4,7 @@
  * actions. For the item-bearing types (timeline, skills, portfolio) it expands into the
  * {@link ItemsEditor} for per-item CRUD.
  */
+import { useState } from 'react';
 import {
   Accordion,
   AccordionDetails,
@@ -11,6 +12,9 @@ import {
   Box,
   Chip,
   IconButton,
+  ListSubheader,
+  Menu,
+  MenuItem,
   Paper,
   Stack,
   Tooltip,
@@ -22,7 +26,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import type { AdminSection } from '../../types/admin';
+import DriveFileMoveOutlinedIcon from '@mui/icons-material/DriveFileMoveOutlined';
+import type { AdminSection, Page } from '../../types/admin';
 import { getSectionTypeDef } from '../../lib/sectionRegistry';
 import type { DragHandleProps } from '../dnd/SortableList';
 import ItemsEditor from './ItemsEditor';
@@ -30,9 +35,13 @@ import ItemsEditor from './ItemsEditor';
 interface SectionCardProps {
   section: AdminSection;
   handle: DragHandleProps;
+  /** All site pages, used to build the "Move to page…" menu (§3.10). */
+  pages: Page[];
   onEdit: () => void;
   onToggleHidden: () => void;
   onDelete: () => void;
+  /** Move this section to another page (PATCH page_id, §3.10). */
+  onMove: (pageId: string) => void;
   onChanged: () => Promise<void> | void;
   onConflict: () => void;
   onError: (message: string) => void;
@@ -41,14 +50,18 @@ interface SectionCardProps {
 export default function SectionCard({
   section,
   handle,
+  pages,
   onEdit,
   onToggleHidden,
   onDelete,
+  onMove,
   onChanged,
   onConflict,
   onError,
 }: SectionCardProps) {
   const def = getSectionTypeDef(section.type);
+  const [moveAnchor, setMoveAnchor] = useState<HTMLElement | null>(null);
+  const moveTargets = pages.filter((p) => p.id !== section.page_id);
 
   const header = (
     <Stack direction="row" spacing={1} sx={{ width: '100%', alignItems: 'center' }}>
@@ -105,6 +118,44 @@ export default function SectionCard({
           )}
         </IconButton>
       </Tooltip>
+      <Tooltip title="Move to page…">
+        <IconButton
+          size="small"
+          aria-label={`Move ${def.label} to another page`}
+          aria-haspopup="menu"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMoveAnchor(e.currentTarget);
+          }}
+        >
+          <DriveFileMoveOutlinedIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Menu
+        anchorEl={moveAnchor}
+        open={Boolean(moveAnchor)}
+        onClose={() => setMoveAnchor(null)}
+        // The menu lives inside the drag handle / accordion header; keep clicks local.
+        onClick={(e) => e.stopPropagation()}
+        slotProps={{ list: { 'aria-label': 'Move to page', dense: true } }}
+      >
+        <ListSubheader disableSticky>Move to page…</ListSubheader>
+        {moveTargets.length === 0 ? (
+          <MenuItem disabled>No other pages</MenuItem>
+        ) : (
+          moveTargets.map((p) => (
+            <MenuItem
+              key={p.id}
+              onClick={() => {
+                setMoveAnchor(null);
+                onMove(p.id);
+              }}
+            >
+              {p.title}
+            </MenuItem>
+          ))
+        )}
+      </Menu>
       <Tooltip title="Delete section">
         <IconButton
           size="small"
