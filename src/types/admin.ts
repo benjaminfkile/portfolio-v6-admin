@@ -36,6 +36,26 @@ export interface AdminSection {
 }
 
 /**
+ * One page in the admin page list (v1.1, §3.10, §4.2 `GET /api/admin/pages`). Pages own
+ * their sections; the nav is the subset with a non-null `nav_label`, ordered by
+ * `nav_position`. The slug `home` is special — it renders at `/` rather than `/<slug>`.
+ *
+ * `updated_at` is load-bearing: every mutating write echoes it back as `expected_updated_at`
+ * for the optimistic-concurrency check (§4.5).
+ */
+export interface Page {
+  id: string;
+  slug: string;
+  title: string;
+  /** null = not shown in the nav (still reachable by direct link at its slug). */
+  nav_label: string | null;
+  nav_position: number;
+  is_hidden: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * One published snapshot in the version history (§4.2 `GET /api/admin/versions`). Each
  * `POST /api/admin/publish` (and each restore) appends one of these; `version` is the
  * monotonically increasing snapshot number, `published_by` the admin who cut it.
