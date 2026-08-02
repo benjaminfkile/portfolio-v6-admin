@@ -9,6 +9,7 @@ import type { SectionType } from '../../types/content';
 function makeSection(type: SectionType): AdminSection {
   return {
     id: 's1',
+    page_id: 'p1',
     type,
     position: 0,
     is_hidden: false,

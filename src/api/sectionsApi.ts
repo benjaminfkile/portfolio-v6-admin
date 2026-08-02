@@ -44,20 +44,38 @@ function rethrowConflict(err: unknown): never {
 export interface UpdatePayload {
   data?: SectionData | ItemData;
   is_hidden?: boolean;
+  /**
+   * Move the section to this page, appended at the end (§3.10). Only meaningful for sections;
+   * a PATCH carrying `page_id` re-parents the row.
+   */
+  page_id?: string;
   /** The `updated_at` from the row as it was last read (§4.5). Required. */
   expected_updated_at: string;
 }
 
 // ---- Sections ---------------------------------------------------------------
 
-/** GET /api/admin/sections — the full working set, drafts included. */
-export async function getSections(): Promise<AdminSection[]> {
-  return unwrap<{ sections: AdminSection[] }>(await apiClient.get('/api/admin/sections')).sections;
+/**
+ * GET /api/admin/sections — the working set for one page (§3.10). Pass `pageId` to scope the
+ * list to that page via `?page_id=`; omit it only for the whole-site set (rarely wanted now
+ * that sections are page-owned).
+ */
+export async function getSections(pageId?: string): Promise<AdminSection[]> {
+  const params = pageId ? { page_id: pageId } : undefined;
+  return unwrap<{ sections: AdminSection[] }>(
+    await apiClient.get('/api/admin/sections', { params }),
+  ).sections;
 }
 
-/** POST /api/admin/sections — create a section of `type`. */
-export async function createSection(type: SectionType, data: SectionData = {}): Promise<AdminSection> {
-  return unwrap<AdminSection>(await apiClient.post('/api/admin/sections', { type, data }));
+/** POST /api/admin/sections — create a section of `type` on `pageId` (page_id required, §3.10). */
+export async function createSection(
+  type: SectionType,
+  data: SectionData = {},
+  pageId?: string,
+): Promise<AdminSection> {
+  return unwrap<AdminSection>(
+    await apiClient.post('/api/admin/sections', { type, data, page_id: pageId }),
+  );
 }
 
 /** PATCH /api/admin/sections/:id — update `data` and/or `is_hidden` (409 on conflict). */
@@ -74,9 +92,12 @@ export async function deleteSection(id: string): Promise<void> {
   await apiClient.delete(`/api/admin/sections/${id}`);
 }
 
-/** PUT /api/admin/sections/order — reorder with the full ordered id array (§4.2). */
-export async function reorderSections(ids: string[]): Promise<void> {
-  await apiClient.put('/api/admin/sections/order', { ids });
+/**
+ * PUT /api/admin/sections/order — reorder within one page with the full ordered id array
+ * (§4.2). The body is `{ page_id, ids }`; ordering is scoped to that page (§3.10).
+ */
+export async function reorderSections(pageId: string, ids: string[]): Promise<void> {
+  await apiClient.put('/api/admin/sections/order', { page_id: pageId, ids });
 }
 
 // ---- Items ------------------------------------------------------------------
