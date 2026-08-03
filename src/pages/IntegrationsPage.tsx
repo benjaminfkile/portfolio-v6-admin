@@ -1,15 +1,21 @@
 /**
- * Integrations — the Spotify connection card (§4.6).
+ * Integrations (§4.7) — one card per integration, driven by the API's list.
  *
- * Spotify expires refresh tokens 180 days after authorization (June 2026
- * policy), and the API degrades SILENTLY when that happens (now-playing just
- * shows idle, by design). This page is where that state becomes visible: it
- * shows when the current authorization expires, warns when it is close, and
- * carries the one-click reconnect. Connect navigates this tab to Spotify's
- * consent page; the API's callback stores the new token and redirects back
- * here with `?spotify=connected|error`, which surfaces as a toast.
+ * The card's `auth_kind` decides the control:
+ *  - oauth (Spotify): the reconnect round-trip. Connect navigates this tab to the
+ *    provider's consent page; the API's callback stores the new token and redirects
+ *    back here with `?spotify=connected|error`, surfaced as a toast. Spotify expires
+ *    refresh tokens 180 days after authorization and degrades SILENTLY, so this card
+ *    also shows when the authorization expires, warns when it is close, and flags the
+ *    untracked static-secret fallback.
+ *  - api_key (GitHub): a pasted secret, entered in a password field, never prefilled.
+ *  - value (Duolingo): a non-secret string, entered in a plain text field.
  *
- * Themed via MUI only (§14.4).
+ * Saved secrets/values are write-only (the API never echoes them), so a connected
+ * credential shows "Connected · saved <date>" rather than the value.
+ *
+ * Per-card copy comes from the API's `name` + `auth_kind`; there are no per-integration
+ * branches beyond kind rendering and the Spotify oauth specifics. Themed via MUI only (§14.4).
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -22,12 +28,20 @@ import {
   Paper,
   Snackbar,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import PersonIcon from '@mui/icons-material/Person';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
-import { connectSpotify, disconnectSpotify, getSpotifyStatus } from '../api/spotifyApi';
-import type { SpotifyStatus } from '../api/spotifyApi';
+import {
+  connectIntegration,
+  disconnectIntegration,
+  getIntegrations,
+  saveIntegrationValue,
+} from '../api/integrationsApi';
+import type { Integration } from '../api/integrationsApi';
 import { formatDate } from '../lib/media';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -38,14 +52,257 @@ function daysUntil(iso: string): number {
   return Math.floor((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
-export default function IntegrationsPage() {
-  const [status, setStatus] = useState<SpotifyStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
+/** Helper text under a credential field — keyed by kind, not by integration. */
+const HELPER_TEXT: Record<Integration['auth_kind'], string> = {
+  oauth: '',
+  api_key: 'Personal access token — public data only (read:user)',
+  value: 'Duolingo username (public)',
+};
 
+interface CardProps {
+  integration: Integration;
+  /** Refetch the whole list after a mutation. */
+  onReload: () => Promise<void>;
+  onToast: (message: string) => void;
+}
+
+/**
+ * The oauth card (Spotify): reconnect round-trip, expiry countdown/warnings, the
+ * untracked-secret flag, and a confirmed disconnect. Preserves §4.6 behavior verbatim.
+ */
+function OAuthCard({ integration, onReload, onToast }: CardProps) {
   const [connecting, setConnecting] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  const { key, name, connected, source, authorized_at, expires_at } = integration;
+  const days = expires_at ? daysUntil(expires_at) : null;
+  const expired = days != null && days < 0;
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    try {
+      const returnTo = `${window.location.origin}/integrations`;
+      const authorizeUrl = await connectIntegration(key, returnTo);
+      // Leave the app: the provider's consent page, then back via the API callback.
+      window.location.assign(authorizeUrl);
+    } catch {
+      onToast(`Could not start the ${name} connection. Is the API reachable?`);
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    try {
+      await disconnectIntegration(key);
+      setConfirmDisconnect(false);
+      onToast(`${name} was disconnected.`);
+      await onReload();
+    } catch {
+      onToast(`Could not disconnect ${name}.`);
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
+        <MusicNoteIcon color="action" />
+        <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
+          {name}
+        </Typography>
+        {connected ? (
+          <Chip
+            size="small"
+            color={expired ? 'error' : 'success'}
+            label={expired ? 'Expired' : 'Connected'}
+            data-testid={`${key}-status-chip`}
+          />
+        ) : (
+          <Chip size="small" label="Not connected" data-testid={`${key}-status-chip`} />
+        )}
+      </Stack>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Powers the public site&apos;s now-playing section. When the authorization expires
+        the section silently shows nothing playing — reconnecting fixes it.
+      </Typography>
+
+      {source === 'admin' && authorized_at && expires_at && (
+        <Alert
+          severity={expired ? 'error' : days != null && days < EXPIRY_WARNING_DAYS ? 'warning' : 'info'}
+          sx={{ mb: 2 }}
+          data-testid={`${key}-expiry`}
+        >
+          Authorized {formatDate(authorized_at)} — {' '}
+          {expired
+            ? `expired ${formatDate(expires_at)}. Reconnect now to bring now-playing back.`
+            : `expires ${formatDate(expires_at)} (${days} day${days === 1 ? '' : 's'} left).`}
+        </Alert>
+      )}
+
+      {source === 'secrets' && (
+        <Alert severity="warning" sx={{ mb: 2 }} data-testid={`${key}-expiry`}>
+          Using the static server-secret token, whose age is not tracked — it may expire
+          without warning. Reconnect here once to switch to a managed token with a visible
+          expiry date.
+        </Alert>
+      )}
+
+      <Stack direction="row" spacing={1}>
+        <Button variant="contained" onClick={() => void handleConnect()} disabled={connecting}>
+          {connecting
+            ? `Redirecting to ${name}…`
+            : source === 'admin'
+              ? `Reconnect ${name}`
+              : `Connect ${name}`}
+        </Button>
+        {source === 'admin' && (
+          <Button
+            color="warning"
+            startIcon={<LinkOffIcon />}
+            onClick={() => setConfirmDisconnect(true)}
+          >
+            Disconnect
+          </Button>
+        )}
+      </Stack>
+
+      <ConfirmDialog
+        open={confirmDisconnect}
+        title={`Disconnect ${name}?`}
+        message={
+          `This removes the stored ${name} authorization. The now-playing section will ` +
+          'show nothing playing until you reconnect.'
+        }
+        confirmLabel={disconnecting ? 'Disconnecting…' : 'Disconnect'}
+        onConfirm={() => void handleDisconnect()}
+        onClose={() => {
+          if (!disconnecting) setConfirmDisconnect(false);
+        }}
+      />
+    </Paper>
+  );
+}
+
+/**
+ * The api_key / value card (GitHub, Duolingo): a write-only credential field (password
+ * for api_key, plain text for value), Save → PUT, and a confirmed disconnect. The stored
+ * value is never displayed — a connected card shows "Connected · saved <date>" instead.
+ */
+function CredentialCard({ integration, onReload, onToast }: CardProps) {
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const { key, name, auth_kind, connected, authorized_at } = integration;
+  const isSecret = auth_kind === 'api_key';
+
+  const handleSave = async () => {
+    if (!draft.trim()) return;
+    setSaving(true);
+    try {
+      await saveIntegrationValue(key, draft);
+      setDraft('');
+      onToast(`${name} saved.`);
+      await onReload();
+    } catch {
+      onToast(`Could not save ${name}.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    try {
+      await disconnectIntegration(key);
+      setConfirmDisconnect(false);
+      onToast(`${name} was disconnected.`);
+      await onReload();
+    } catch {
+      onToast(`Could not disconnect ${name}.`);
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
+        {isSecret ? <VpnKeyIcon color="action" /> : <PersonIcon color="action" />}
+        <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
+          {name}
+        </Typography>
+        <Chip
+          size="small"
+          color={connected ? 'success' : 'default'}
+          label={connected ? 'Connected' : 'Not connected'}
+          data-testid={`${key}-status-chip`}
+        />
+      </Stack>
+
+      {connected && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }} data-testid={`${key}-saved`}>
+          Connected{authorized_at ? ` · saved ${formatDate(authorized_at)}` : ''}
+        </Typography>
+      )}
+
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+        <TextField
+          type={isSecret ? 'password' : 'text'}
+          size="small"
+          fullWidth
+          label={connected ? `Replace ${name}` : name}
+          placeholder={isSecret ? '••••••••' : ''}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          helperText={HELPER_TEXT[auth_kind]}
+          // Never prefilled and never echoing a stored secret.
+          slotProps={{ htmlInput: { 'data-testid': `${key}-input`, autoComplete: 'off' } }}
+        />
+      </Stack>
+
+      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+        <Button
+          variant="contained"
+          onClick={() => void handleSave()}
+          disabled={saving || !draft.trim()}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+        {connected && (
+          <Button
+            color="warning"
+            startIcon={<LinkOffIcon />}
+            onClick={() => setConfirmDisconnect(true)}
+          >
+            Disconnect
+          </Button>
+        )}
+      </Stack>
+
+      <ConfirmDialog
+        open={confirmDisconnect}
+        title={`Disconnect ${name}?`}
+        message={`This removes the stored ${name} credential. Save a new one to reconnect.`}
+        confirmLabel={disconnecting ? 'Disconnecting…' : 'Disconnect'}
+        onConfirm={() => void handleDisconnect()}
+        onClose={() => {
+          if (!disconnecting) setConfirmDisconnect(false);
+        }}
+      />
+    </Paper>
+  );
+}
+
+export default function IntegrationsPage() {
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -54,9 +311,9 @@ export default function IntegrationsPage() {
     setLoading(true);
     setLoadError('');
     try {
-      setStatus(await getSpotifyStatus());
+      setIntegrations(await getIntegrations());
     } catch {
-      setLoadError('Could not load the Spotify status. Is the API reachable?');
+      setLoadError('Could not load the integrations. Is the API reachable?');
     } finally {
       setLoading(false);
     }
@@ -66,8 +323,8 @@ export default function IntegrationsPage() {
     void load();
   }, [load]);
 
-  // Returning from the OAuth round-trip: the API callback redirected back here
-  // with ?spotify=connected|error. Toast it once, then strip the param.
+  // Returning from the OAuth round-trip: the API callback redirected back here with
+  // ?spotify=connected|error. Toast it once, then strip the param.
   useEffect(() => {
     const result = searchParams.get('spotify');
     if (!result) return;
@@ -81,33 +338,6 @@ export default function IntegrationsPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const returnTo = `${window.location.origin}/integrations`;
-      const authorizeUrl = await connectSpotify(returnTo);
-      // Leave the app: Spotify's consent page, then back via the API callback.
-      window.location.assign(authorizeUrl);
-    } catch {
-      setToast('Could not start the Spotify connection. Is the API reachable?');
-      setConnecting(false);
-    }
-  };
-
-  const handleDisconnect = async () => {
-    setDisconnecting(true);
-    try {
-      await disconnectSpotify();
-      setConfirmDisconnect(false);
-      setToast('Spotify was disconnected.');
-      await load();
-    } catch {
-      setToast('Could not disconnect Spotify.');
-    } finally {
-      setDisconnecting(false);
-    }
-  };
-
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
@@ -116,9 +346,6 @@ export default function IntegrationsPage() {
     );
   }
 
-  const days = status?.expires_at ? daysUntil(status.expires_at) : null;
-  const expired = days != null && days < 0;
-
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
@@ -126,8 +353,9 @@ export default function IntegrationsPage() {
           Integrations
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          External services the site depends on. Spotify authorizations expire every 180
-          days, so reconnect here when the expiry approaches.
+          External services the site depends on. OAuth authorizations (like Spotify&apos;s)
+          expire periodically — reconnect here when the expiry approaches; paste API keys and
+          public values for the rest.
         </Typography>
       </Box>
 
@@ -143,88 +371,26 @@ export default function IntegrationsPage() {
           {loadError}
         </Alert>
       ) : (
-        <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
-            <MusicNoteIcon color="action" />
-            <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
-              Spotify
-            </Typography>
-            {status?.connected ? (
-              <Chip
-                size="small"
-                color={expired ? 'error' : 'success'}
-                label={expired ? 'Expired' : 'Connected'}
-                data-testid="spotify-status-chip"
+        <Stack spacing={2}>
+          {integrations.map((integration) =>
+            integration.auth_kind === 'oauth' ? (
+              <OAuthCard
+                key={integration.key}
+                integration={integration}
+                onReload={load}
+                onToast={setToast}
               />
             ) : (
-              <Chip size="small" label="Not connected" data-testid="spotify-status-chip" />
-            )}
-          </Stack>
-
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Powers the public site&apos;s now-playing section. When the authorization
-            expires the section silently shows nothing playing — reconnecting fixes it.
-          </Typography>
-
-          {status?.source === 'admin' && status.authorized_at && status.expires_at && (
-            <Alert
-              severity={expired ? 'error' : days != null && days < EXPIRY_WARNING_DAYS ? 'warning' : 'info'}
-              sx={{ mb: 2 }}
-              data-testid="spotify-expiry"
-            >
-              Authorized {formatDate(status.authorized_at)} — {' '}
-              {expired
-                ? `expired ${formatDate(status.expires_at)}. Reconnect now to bring now-playing back.`
-                : `expires ${formatDate(status.expires_at)} (${days} day${days === 1 ? '' : 's'} left).`}
-            </Alert>
+              <CredentialCard
+                key={integration.key}
+                integration={integration}
+                onReload={load}
+                onToast={setToast}
+              />
+            ),
           )}
-
-          {status?.source === 'secrets' && (
-            <Alert severity="warning" sx={{ mb: 2 }} data-testid="spotify-expiry">
-              Using the static server-secret token, whose age is not tracked — it may
-              expire without warning. Reconnect here once to switch to a managed token
-              with a visible expiry date.
-            </Alert>
-          )}
-
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="contained"
-              onClick={() => void handleConnect()}
-              disabled={connecting}
-            >
-              {connecting
-                ? 'Redirecting to Spotify…'
-                : status?.source === 'admin'
-                  ? 'Reconnect Spotify'
-                  : 'Connect Spotify'}
-            </Button>
-            {status?.source === 'admin' && (
-              <Button
-                color="warning"
-                startIcon={<LinkOffIcon />}
-                onClick={() => setConfirmDisconnect(true)}
-              >
-                Disconnect
-              </Button>
-            )}
-          </Stack>
-        </Paper>
+        </Stack>
       )}
-
-      <ConfirmDialog
-        open={confirmDisconnect}
-        title="Disconnect Spotify?"
-        message={
-          'This removes the stored Spotify authorization. The now-playing section will ' +
-          'show nothing playing until you reconnect.'
-        }
-        confirmLabel={disconnecting ? 'Disconnecting…' : 'Disconnect'}
-        onConfirm={() => void handleDisconnect()}
-        onClose={() => {
-          if (!disconnecting) setConfirmDisconnect(false);
-        }}
-      />
 
       <Snackbar
         open={Boolean(toast)}
