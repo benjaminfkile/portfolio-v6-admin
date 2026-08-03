@@ -4,27 +4,16 @@
  * per-item CRUD inside the item-bearing types. Every save carries `expected_updated_at`;
  * a 409 raises the shared "changed since you loaded it" dialog offering a refetch (§4.5).
  *
- * This is also where the working set is published live: the "Publish" action snapshots the
- * current sections/items as a new version via `POST /api/admin/publish` (§4.2). The API
- * re-validates the whole working set first (§3.9), so a validation refusal is surfaced as a
- * clear per-issue list rather than an opaque toast.
+ * Publishing is NOT here: publish is site-level (it snapshots every page, §3.10), so it
+ * lives in the AppShell app bar as PublishSiteButton.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
-  AlertTitle,
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  List,
-  ListItem,
-  ListItemText,
   Snackbar,
   Stack,
   Tab,
@@ -32,7 +21,6 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import PublishIcon from '@mui/icons-material/Publish';
 import type { AdminSection, Page } from '../types/admin';
 import type { SectionType } from '../types/content';
 import { getSectionTypeDef } from '../lib/sectionRegistry';
@@ -45,7 +33,6 @@ import {
   updateSection,
 } from '../api/sectionsApi';
 import { getPages } from '../api/pagesApi';
-import { PublishValidationError, publishSite } from '../api/versionsApi';
 import SortableList, { type DragHandleProps } from '../components/dnd/SortableList';
 import SectionCard from '../components/sections/SectionCard';
 import CreateSectionDialog from '../components/sections/CreateSectionDialog';
@@ -81,10 +68,6 @@ export default function SectionsPage() {
   const [saving, setSaving] = useState(false);
   const [conflictOpen, setConflictOpen] = useState(false);
   const [toast, setToast] = useState('');
-
-  const [publishOpen, setPublishOpen] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [publishIssues, setPublishIssues] = useState<string[]>([]);
 
   // Refetch just the sections for the currently selected page (used after every mutation).
   const refetch = useCallback(async () => {
@@ -223,32 +206,6 @@ export default function SectionsPage() {
     await load();
   };
 
-  const handlePublish = async () => {
-    setPublishing(true);
-    setPublishIssues([]);
-    try {
-      const version = await publishSite();
-      setPublishOpen(false);
-      setToast(`Published version ${version.version}. It is now live.`);
-    } catch (err) {
-      if (err instanceof PublishValidationError) {
-        // Keep the dialog open and list every failure inline (§3.9).
-        setPublishIssues([err.message, ...err.issues]);
-      } else {
-        setPublishOpen(false);
-        setToast('Could not publish the page. Is the API reachable?');
-      }
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const closePublish = () => {
-    if (publishing) return;
-    setPublishOpen(false);
-    setPublishIssues([]);
-  };
-
   return (
     <Box>
       <Stack
@@ -258,26 +215,14 @@ export default function SectionsPage() {
         <Typography variant="h4" component="h1">
           Sections
         </Typography>
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setCreating(true)}
-            disabled={!selectedPageId}
-          >
-            Add section
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<PublishIcon />}
-            onClick={() => {
-              setPublishIssues([]);
-              setPublishOpen(true);
-            }}
-          >
-            Publish
-          </Button>
-        </Stack>
+        <Button
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={() => setCreating(true)}
+          disabled={!selectedPageId}
+        >
+          Add section
+        </Button>
       </Stack>
 
       {pages.length > 0 && (
@@ -382,42 +327,6 @@ export default function SectionsPage() {
         onRefetch={() => void handleRefetchFromConflict()}
         onClose={() => setConflictOpen(false)}
       />
-
-      <Dialog open={publishOpen} onClose={closePublish} maxWidth="sm" fullWidth>
-        <DialogTitle>Publish the page?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            This snapshots the current working set as a new version and makes it live on the
-            public site immediately (§4.2). The whole page is validated first — if anything is
-            invalid, nothing is published.
-          </DialogContentText>
-          {publishIssues.length > 0 && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              <AlertTitle>Publish failed validation</AlertTitle>
-              <List dense disablePadding>
-                {publishIssues.map((issue, i) => (
-                  <ListItem key={i} disableGutters sx={{ py: 0 }}>
-                    <ListItemText primary={issue} />
-                  </ListItem>
-                ))}
-              </List>
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closePublish} disabled={publishing}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<PublishIcon />}
-            onClick={() => void handlePublish()}
-            disabled={publishing}
-          >
-            {publishing ? 'Publishing…' : 'Publish now'}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <Snackbar
         open={Boolean(toast)}

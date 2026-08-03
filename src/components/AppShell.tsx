@@ -27,6 +27,7 @@ import HubIcon from '@mui/icons-material/Hub';
 import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import PublishSiteButton from './PublishSiteButton';
 
 const DRAWER_WIDTH = 240;
 
@@ -97,6 +98,9 @@ export default function AppShell() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Admin
           </Typography>
+          {/* Publish is site-level — it snapshots every page (§3.10), so it lives in
+              the global chrome, not on any one editing screen. */}
+          <PublishSiteButton />
           <ThemeToggle />
           {currentUser?.email && (
             <Typography variant="body2" sx={{ mx: 2, display: { xs: 'none', sm: 'block' } }}>
