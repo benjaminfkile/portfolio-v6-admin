@@ -17,3 +17,6 @@ coverage
 
 .vercel
 .env*
+
+# Vite dev-server dependency cache
+.vite/
