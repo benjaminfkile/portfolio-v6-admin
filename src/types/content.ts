@@ -40,6 +40,9 @@ export type SectionType =
   | 'status'
   | 'blog'
   | 'now_playing'
+  | 'duolingo'
+  | 'github'
+  | 'ops'
   | 'contact';
 
 /* -- Section `data` shapes ---------------------------------------------------------- */
@@ -99,6 +102,34 @@ export interface NowPlayingData {
   idle: 'hide' | 'message';
   idle_message?: string;
   show_album_art: boolean;
+}
+
+/**
+ * duolingo — live section (§3.5, v1.2): config only. Course code + optional
+ * hand-maintained score label; streak/XP fetched from `GET /api/duolingo` at runtime.
+ */
+export interface DuolingoData {
+  heading?: string;
+  language: string;
+  score_label?: string;
+}
+
+/**
+ * github — live section (§3.5, v1.2): config only. Contribution-calendar weeks;
+ * data fetched from `GET /api/github` at runtime.
+ */
+export interface GithubData {
+  heading?: string;
+  weeks?: number;
+}
+
+/**
+ * ops — live section (§3.5, v1.3): config only. Metric lookback window; telemetry
+ * fetched from `GET /api/ops` at runtime.
+ */
+export interface OpsData {
+  heading?: string;
+  window_hours?: number;
 }
 
 /** contact — static section (no items). */
@@ -167,6 +198,9 @@ export type Section =
   | SectionBase<'status', StatusData>
   | SectionBase<'blog', BlogData>
   | SectionBase<'now_playing', NowPlayingData>
+  | SectionBase<'duolingo', DuolingoData>
+  | SectionBase<'github', GithubData>
+  | SectionBase<'ops', OpsData>
   | SectionBase<'contact', ContactData>;
 
 /* ------------------------------------------------------- Post body blocks (§3.7) --- */

@@ -172,6 +172,60 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     ],
     defaultData: { idle: 'hide', show_album_art: true },
   },
+  duolingo: {
+    type: 'duolingo',
+    label: 'Duolingo (live)',
+    hasItems: false,
+    fields: [
+      { key: 'heading', label: 'Heading', kind: 'text' },
+      {
+        key: 'language',
+        label: 'Course language',
+        kind: 'text',
+        required: true,
+        helperText: 'Duolingo course code, e.g. "es" for Spanish',
+      },
+      {
+        key: 'score_label',
+        label: 'Score label',
+        kind: 'text',
+        helperText:
+          'Hand-maintained — the official Duolingo Score is not exposed by the API. ' +
+          'Update here when it changes, e.g. "Duolingo Score 95".',
+      },
+    ],
+    defaultData: { language: 'es' },
+  },
+  github: {
+    type: 'github',
+    label: 'GitHub (live)',
+    hasItems: false,
+    fields: [
+      { key: 'heading', label: 'Heading', kind: 'text' },
+      {
+        key: 'weeks',
+        label: 'Weeks of history',
+        kind: 'number',
+        helperText: '1–53; defaults to 52 (a full year)',
+      },
+    ],
+    defaultData: {},
+  },
+  ops: {
+    type: 'ops',
+    label: 'Ops dashboard (live)',
+    hasItems: false,
+    fields: [
+      { key: 'heading', label: 'Heading', kind: 'text' },
+      {
+        key: 'window_hours',
+        label: 'Lookback window (hours)',
+        kind: 'number',
+        helperText: '1–24; defaults to 3',
+      },
+    ],
+    defaultData: {},
+  },
   contact: {
     type: 'contact',
     label: 'Contact',
