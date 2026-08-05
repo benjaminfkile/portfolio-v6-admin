@@ -70,3 +70,65 @@ export interface Version {
   published_at: string;
   published_by: string;
 }
+
+// ---- First-party analytics (§4.8, v1.4) ------------------------------------
+
+/** The three range windows the Analytics page offers; passed to the API as `?days=`. */
+export type AnalyticsRange = 7 | 30 | 90;
+
+/** Headline totals over the window. `engaged` = sessions with ≥1 non-pageview event. */
+export interface AnalyticsTotals {
+  /** All pageviews (one per route change on the public site). */
+  pageviews: number;
+  /** Distinct `session_key`s — the daily-rotating visitor hash (§4.8). */
+  visitors: number;
+  /** Sessions that scrolled, clicked out, played a video, or toggled the theme. */
+  engaged: number;
+}
+
+/**
+ * One day's traffic. The API may OMIT zero-activity days (§4.8), so the page fills the
+ * gaps client-side ({@link fillDailyGaps}) to give the chart one bar per calendar day.
+ */
+export interface DailyPoint {
+  /** `YYYY-MM-DD` (UTC). */
+  date: string;
+  pageviews: number;
+  visitors: number;
+}
+
+export interface TopPage {
+  path: string;
+  views: number;
+}
+
+export interface TopReferrer {
+  /** Origin only (scheme + host); same-origin referrers are stored as null (§4.8). */
+  origin: string;
+  count: number;
+}
+
+export interface EventCount {
+  /** One of the beacon allowlist — `pageview | link_out | video_play | theme_toggle | scroll_depth`. */
+  event: string;
+  count: number;
+}
+
+export interface TopOutbound {
+  href: string;
+  count: number;
+}
+
+/**
+ * The one curated summary `GET /api/admin/analytics?days=` returns (§4.8). Everything the
+ * Analytics page draws — stat cards, the daily chart, and the four tables — comes from here.
+ */
+export interface AnalyticsSummary {
+  days: number;
+  totals: AnalyticsTotals;
+  daily: DailyPoint[];
+  top_pages: TopPage[];
+  top_referrers: TopReferrer[];
+  events: EventCount[];
+  top_outbound: TopOutbound[];
+}
