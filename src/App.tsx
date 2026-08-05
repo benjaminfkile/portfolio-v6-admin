@@ -12,6 +12,7 @@ import MediaPage from './pages/MediaPage';
 import VersionsPage from './pages/VersionsPage';
 import PreviewPage from './pages/PreviewPage';
 import IntegrationsPage from './pages/IntegrationsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/versions" element={<VersionsPage />} />
             <Route path="/preview" element={<PreviewPage />} />
             <Route path="/integrations" element={<IntegrationsPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

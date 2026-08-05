@@ -24,6 +24,7 @@ import PermMediaIcon from '@mui/icons-material/PermMedia';
 import HistoryIcon from '@mui/icons-material/History';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import HubIcon from '@mui/icons-material/Hub';
+import InsightsIcon from '@mui/icons-material/Insights';
 import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
@@ -46,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Versions', path: '/versions', icon: <HistoryIcon /> },
   { label: 'Preview', path: '/preview', icon: <VisibilityIcon /> },
   { label: 'Integrations', path: '/integrations', icon: <HubIcon /> },
+  { label: 'Analytics', path: '/analytics', icon: <InsightsIcon /> },
 ];
 
 export default function AppShell() {
