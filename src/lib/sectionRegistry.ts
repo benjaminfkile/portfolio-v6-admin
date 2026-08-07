@@ -38,6 +38,18 @@ export interface FieldDef {
   max?: number;
   /** `number` fields that must be whole numbers (mirrors `z.int()`). */
   integer?: boolean;
+  /**
+   * `icon` fields only: marks this as the DARK-theme override field. It flips the picker into
+   * its tint-first mode (Simple Icons + ink presets), since devicon has no light variants of
+   * its monochrome logos — the exact case a dark override exists for (Icons v1.6.1).
+   */
+  dark?: boolean;
+  /**
+   * `icon` fields only: the sibling key holding the light/default icon. When set on a `dark`
+   * field, the picker pre-seeds its tint search with that icon's name so "same logo, tinted"
+   * is one click.
+   */
+  lightSourceKey?: string;
 }
 
 export interface SectionTypeDef {
@@ -133,9 +145,11 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
         key: 'icon_source_dark',
         label: 'Dark theme icon',
         kind: 'icon',
+        dark: true,
+        lightSourceKey: 'icon_source',
         helperText:
-          'Optional dark-theme override — falls back to the default icon when empty. ' +
-          'Use for a lighter/tintable variant that stays visible on dark.',
+          'A light-tinted version of the logo for the dark theme — most logos need this ' +
+          'only if they are dark-coloured. Falls back to the default icon when empty.',
       },
     ],
     defaultData: {},

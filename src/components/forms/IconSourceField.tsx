@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { Box, Button, Link, Stack, TextField, Typography } from '@mui/material';
 import IconPicker from './IconPicker';
+import { deviconNameFromUrl } from '../../api/iconsApi';
 
 interface IconSourceFieldProps {
   label: string;
@@ -19,6 +20,10 @@ interface IconSourceFieldProps {
   /** `undefined` removes the key (used when clearing an optional dark override). */
   onChange: (value: string | undefined) => void;
   helperText?: string;
+  /** Dark-theme override field: opens the picker tint-first (Simple Icons + ink presets). */
+  dark?: boolean;
+  /** The sibling light/default icon URL — pre-seeds the tint search on a dark field. */
+  lightIconUrl?: string;
 }
 
 /** Plain swatch chips so a dark glyph's invisibility on dark is obvious inline too. */
@@ -31,6 +36,8 @@ export default function IconSourceField({
   required,
   onChange,
   helperText,
+  dark,
+  lightIconUrl,
 }: IconSourceFieldProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [manual, setManual] = useState(false);
@@ -92,6 +99,8 @@ export default function IconSourceField({
       <IconPicker
         open={pickerOpen}
         title={`Choose ${label.toLowerCase()}`}
+        dark={dark}
+        seedSearch={dark ? deviconNameFromUrl(lightIconUrl) ?? undefined : undefined}
         onClose={() => setPickerOpen(false)}
         onSelect={(url) => onChange(url)}
       />

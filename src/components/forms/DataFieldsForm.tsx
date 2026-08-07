@@ -29,7 +29,13 @@ export default function DataFieldsForm({ fields, data, onChange }: DataFieldsFor
   return (
     <Stack spacing={2.5} sx={{ mt: 1 }}>
       {fields.map((field) => (
-        <FieldRenderer key={field.key} field={field} value={data[field.key]} onChange={setField} />
+        <FieldRenderer
+          key={field.key}
+          field={field}
+          value={data[field.key]}
+          data={data}
+          onChange={setField}
+        />
       ))}
     </Stack>
   );

@@ -12,6 +12,8 @@ vi.mock('../../api/iconsApi', async (importOriginal) => {
     ...actual,
     getDeviconManifest: vi.fn(),
     importIcon: vi.fn(),
+    getSimpleIconsManifest: vi.fn(),
+    importSimpleIcon: vi.fn(),
   };
 });
 
@@ -23,6 +25,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getDeviconManifest).mockResolvedValue({ version: 'v2.16.0', icons: ICONS });
   vi.mocked(api.importIcon).mockResolvedValue('https://cdn.example.com/icons/devicon/react-plain@v2.16.0.svg');
+  vi.mocked(api.getSimpleIconsManifest).mockResolvedValue({
+    version: '13.0.0',
+    icons: [
+      { slug: 'react', title: 'React' },
+      { slug: 'express', title: 'Express' },
+    ],
+  });
+  vi.mocked(api.importSimpleIcon).mockResolvedValue(
+    'https://cdn.example.com/icons/simpleicons/react-EDF1F7.svg',
+  );
 });
 
 describe('IconSourceField', () => {
@@ -84,5 +96,46 @@ describe('IconSourceField', () => {
     expect(onChange).toHaveBeenCalledWith(
       'https://cdn.example.com/icons/devicon/react-plain@v2.16.0.svg',
     );
+  });
+
+  it('dark field opens the tint-first picker and imports a tinted CDN url', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<IconSourceField label="Dark theme icon" value="" dark onChange={onChange} />);
+
+    await user.click(screen.getByRole('button', { name: /choose/i }));
+
+    // Tint tab is the default for a dark field.
+    expect(screen.getByRole('tab', { name: /tinted \(recommended\)/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await user.click(await screen.findByRole('button', { name: /select express/i }));
+    await user.click(screen.getByRole('button', { name: /use this icon/i }));
+
+    await waitFor(() => expect(api.importSimpleIcon).toHaveBeenCalledWith('express', 'EDF1F7'));
+    expect(onChange).toHaveBeenCalledWith(
+      'https://cdn.example.com/icons/simpleicons/react-EDF1F7.svg',
+    );
+  });
+
+  it('pre-seeds the tint search from a devicon-imported light icon (one-click same-logo tint)', async () => {
+    const user = userEvent.setup();
+    render(
+      <IconSourceField
+        label="Dark theme icon"
+        value=""
+        dark
+        lightIconUrl="https://cdn.example.com/icons/devicon/react-original@v2.16.0.svg"
+        onChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /choose/i }));
+
+    // The search is seeded with "react" (parsed from the light icon URL) — Express is filtered out.
+    expect(await screen.findByLabelText(/search simple icons/i)).toHaveValue('react');
+    await screen.findByRole('button', { name: /select react/i });
+    expect(screen.queryByRole('button', { name: /select express/i })).not.toBeInTheDocument();
   });
 });

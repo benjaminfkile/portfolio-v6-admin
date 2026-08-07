@@ -84,3 +84,89 @@ export function searchIcons(icons: DeviconIcon[], query: string): DeviconIcon[] 
     return false;
   });
 }
+
+/* ----------------------------------------------------------------------------------------
+ * Simple Icons (Icons v1.6.1) — the tint-first catalog for dark-theme overrides.
+ *
+ * devicon ships NO light/white variants of its monochrome logos, so the dark-override flow
+ * is a dead end exactly when it is needed (a black express glyph, a dark wordmark). Simple
+ * Icons provides every major brand logo as a single-path SVG, and its CDN renders any icon
+ * at any colour: `https://cdn.simpleicons.org/<slug>/<hex>` (hex WITHOUT '#'). Tinting to a
+ * light ink is the real fix for dark, so it is first-class here — a mirror of the devicon
+ * endpoints below, pinned + server-cached the same way.
+ * -------------------------------------------------------------------------------------- */
+
+/** One icon in the Simple Icons catalog (slimmed by the server to what the picker needs). */
+export interface SimpleIcon {
+  slug: string;
+  title: string;
+}
+
+/** GET /api/admin/icons/simpleicons-manifest payload. `version` is the pinned release. */
+export interface SimpleIconsManifest {
+  version: string;
+  icons: SimpleIcon[];
+}
+
+/** GET /api/admin/icons/simpleicons-manifest — the pinned, server-cached Simple Icons catalog. */
+export async function getSimpleIconsManifest(): Promise<SimpleIconsManifest> {
+  return unwrap<SimpleIconsManifest>(
+    await apiClient.get('/api/admin/icons/simpleicons-manifest'),
+  );
+}
+
+/**
+ * POST /api/admin/icons/import (simpleicons body shape) — import a Simple Icons logo tinted
+ * to `color` (a 3/6-digit hex WITHOUT '#'). The API validates the slug against the pinned
+ * catalog and the colour by regex, fetches the tinted SVG from cdn.simpleicons.org, stores
+ * it at `icons/simpleicons/<slug>-<color>.svg` in the media bucket, and returns the
+ * media-CDN URL (idempotent: the deterministic key means a re-import returns the same URL).
+ */
+export async function importSimpleIcon(slug: string, color: string): Promise<string> {
+  return unwrap<{ url: string }>(
+    await apiClient.post('/api/admin/icons/import', { source: 'simpleicons', slug, color }),
+  ).url;
+}
+
+/**
+ * Build a cdn.simpleicons.org URL for a tinted logo — PREVIEW ONLY. The CDN serves current
+ * artwork at any colour; the stored value is always the imported media-CDN URL, never this.
+ * `color` is a hex WITHOUT '#'.
+ */
+export function simpleIconPreviewUrl(slug: string, color: string): string {
+  return `https://cdn.simpleicons.org/${slug}/${color}`;
+}
+
+/** Case-insensitive search over the Simple Icons catalog by title and slug. */
+export function searchSimpleIcons(icons: SimpleIcon[], query: string): SimpleIcon[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return icons;
+  return icons.filter(
+    (icon) =>
+      icon.title.toLowerCase().includes(q) || icon.slug.toLowerCase().includes(q),
+  );
+}
+
+/** 3- or 6-digit hex, WITHOUT a leading '#'. Mirrors the API's colour validation. */
+export const HEX_COLOR_RE = /^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
+
+/** Whether `color` (hex without '#') is a valid 3/6-digit hex the import will accept. */
+export function isValidHexColor(color: string): boolean {
+  return HEX_COLOR_RE.test(color);
+}
+
+/**
+ * Best-effort devicon name from a stored icon URL, used only to PRE-SEED the tint search
+ * when opening the dark picker over an item that already has a devicon-imported light icon
+ * ("same logo, tinted" in one click). Devicon imports live under `icons/devicon/<name>-<variant>…`;
+ * we take the segment before the first '-' (devicon names rarely contain one). Returns null
+ * for non-devicon URLs (custom/self-hosted/simpleicons) — there is simply nothing to seed.
+ */
+export function deviconNameFromUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+  const m = url.match(/\/icons\/devicon\/([^/?#]+)/);
+  if (!m) return null;
+  const file = m[1].replace(/\.svg$/i, '').replace(/@.*$/, '');
+  const name = file.split('-')[0];
+  return name || null;
+}
