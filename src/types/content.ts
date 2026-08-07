@@ -56,13 +56,14 @@ export interface HeroData {
 
 /** about — static prose section (no items). */
 export interface AboutData {
-  title?: string;
+  heading?: string;
   body: string;
 }
 
 /** timeline — optional heading; entries live in `section_items` (§3.4). */
 export interface TimelineData {
-  title?: string;
+  heading?: string;
+  intro?: string;
 }
 
 /**
@@ -73,13 +74,14 @@ export interface TimelineData {
  * skill items (clamped to 4).
  */
 export interface SkillsData {
-  title?: string;
+  heading?: string;
+  intro?: string;
   sphere_detail?: number;
 }
 
 /** portfolio — optional heading/intro; projects live in `section_items` (§3.4). */
 export interface PortfolioData {
-  title?: string;
+  heading?: string;
   intro?: string;
 }
 
@@ -141,8 +143,8 @@ export interface OpsData {
 
 /** contact — static section (no items). */
 export interface ContactData {
-  title?: string;
-  email?: string;
+  heading?: string;
+  body?: string;
   links?: Link[];
 }
 

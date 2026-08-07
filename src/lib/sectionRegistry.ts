@@ -30,6 +30,13 @@ export interface FieldDef {
   /** Options for `select` fields. */
   options?: { value: string; label: string }[];
   helperText?: string;
+  /** Bounds for `number` fields — enforced client-side so an out-of-range
+   *  value is caught in the form, not as an opaque server reject. The API's
+   *  zod schemas remain the authority; these mirror them. */
+  min?: number;
+  max?: number;
+  /** `number` fields that must be whole numbers (mirrors `z.int()`). */
+  integer?: boolean;
 }
 
 export interface SectionTypeDef {
@@ -68,7 +75,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     label: 'About',
     hasItems: false,
     fields: [
-      { key: 'title', label: 'Title', kind: 'text' },
+      { key: 'heading', label: 'Heading', kind: 'text' },
       { key: 'body', label: 'Body', kind: 'multiline', required: true },
     ],
     defaultData: { body: '' },
@@ -77,7 +84,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     type: 'timeline',
     label: 'Timeline',
     hasItems: true,
-    fields: [{ key: 'title', label: 'Heading', kind: 'text' }],
+    fields: [{ key: 'heading', label: 'Heading', kind: 'text' }],
     itemNoun: 'entry',
     itemFields: [
       { key: 'date_range', label: 'Date range', kind: 'text', required: true },
@@ -93,11 +100,14 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     label: 'Skills',
     hasItems: true,
     fields: [
-      { key: 'title', label: 'Heading', kind: 'text' },
+      { key: 'heading', label: 'Heading', kind: 'text' },
       {
         key: 'sphere_detail',
         label: 'Sphere detail (0–4)',
         kind: 'number',
+        min: 0,
+        max: 4,
+        integer: true,
         helperText:
           'Geodesic sphere density — face count 20/80/180/320/500. ' +
           'Leave blank to auto-fit to the number of skills.',
@@ -117,7 +127,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     label: 'Portfolio',
     hasItems: true,
     fields: [
-      { key: 'title', label: 'Heading', kind: 'text' },
+      { key: 'heading', label: 'Heading', kind: 'text' },
       { key: 'intro', label: 'Intro', kind: 'multiline' },
     ],
     itemNoun: 'project',
@@ -126,7 +136,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       { key: 'intro', label: 'Intro', kind: 'multiline' },
       { key: 'description', label: 'Description', kind: 'multiline', required: true },
       { key: 'media_id', label: 'Media', kind: 'media', required: true },
-      { key: 'playback_rate', label: 'Playback rate', kind: 'number' },
+      { key: 'playback_rate', label: 'Playback rate', kind: 'number', min: 0.1 },
       { key: 'transform_value', label: 'Transform value', kind: 'text' },
       { key: 'tech_icons', label: 'Tech icons', kind: 'stringList' },
       { key: 'links', label: 'Links', kind: 'links', helperText: LINK_HELPER },
@@ -156,7 +166,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     label: 'Blog (live)',
     hasItems: false,
     fields: [
-      { key: 'limit', label: 'Number of posts', kind: 'number', required: true },
+      { key: 'limit', label: 'Number of posts', kind: 'number', required: true, min: 1, integer: true },
       { key: 'tag', label: 'Tag filter', kind: 'text' },
     ],
     defaultData: { limit: 3 },
@@ -215,6 +225,9 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
         key: 'weeks',
         label: 'Weeks of history',
         kind: 'number',
+        min: 1,
+        max: 53,
+        integer: true,
         helperText: '1–53; defaults to 52 (a full year)',
       },
     ],
@@ -230,6 +243,9 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
         key: 'window_hours',
         label: 'Lookback window (hours)',
         kind: 'number',
+        min: 1,
+        max: 24,
+        integer: true,
         helperText: '1–24; defaults to 3',
       },
     ],
@@ -240,8 +256,8 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     label: 'Contact',
     hasItems: false,
     fields: [
-      { key: 'title', label: 'Title', kind: 'text' },
-      { key: 'email', label: 'Email', kind: 'text' },
+      { key: 'heading', label: 'Heading', kind: 'text' },
+      { key: 'body', label: 'Body', kind: 'multiline' },
       { key: 'links', label: 'Links', kind: 'links', helperText: LINK_HELPER },
     ],
     defaultData: {},

@@ -49,6 +49,13 @@ export default function FieldRenderer({ field, value, onChange }: FieldRendererP
           fullWidth
           size="small"
           helperText={field.helperText}
+          slotProps={{
+            htmlInput: {
+              min: field.min,
+              max: field.max,
+              step: field.integer ? 1 : undefined,
+            },
+          }}
         />
       );
 

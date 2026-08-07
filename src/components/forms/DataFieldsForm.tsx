@@ -54,6 +54,23 @@ export function validateData(fields: FieldDef[], data: Record<string, unknown>):
         problems.push(`${field.label} is required`);
       }
     }
+    // Bounds/integer checks for provided number values — mirrors the API's zod
+    // schema so an out-of-range value (e.g. sphere detail 20) is caught in the
+    // form instead of surfacing as an opaque "could not save" server reject.
+    if (field.kind === 'number' && value !== undefined && value !== null) {
+      const num = Number(value);
+      if (!Number.isNaN(num)) {
+        if (field.integer && !Number.isInteger(num)) {
+          problems.push(`${field.label} must be a whole number`);
+        }
+        if (field.min !== undefined && num < field.min) {
+          problems.push(`${field.label} must be at least ${field.min}`);
+        }
+        if (field.max !== undefined && num > field.max) {
+          problems.push(`${field.label} must be at most ${field.max}`);
+        }
+      }
+    }
     if (field.kind === 'links' && Array.isArray(value) && !areLinksValid(value as Link[])) {
       problems.push(`${field.label}: every link needs a label and an http(s) URL`);
     }
