@@ -12,6 +12,7 @@ import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/ma
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import type { Post } from '../types/content';
 import { getPost } from '../api/postsApi';
+import { serverMessage } from '../api/serverMessage';
 import PreviewFrame from '../components/preview/PreviewFrame';
 import { postPreviewUrl } from '../lib/previewUrl';
 
@@ -28,8 +29,8 @@ export default function PostPreviewPage() {
     setLoadError('');
     try {
       setPost(await getPost(id));
-    } catch {
-      setLoadError('Could not load this post. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load this post. Is the API reachable?'));
     } finally {
       setLoading(false);
     }

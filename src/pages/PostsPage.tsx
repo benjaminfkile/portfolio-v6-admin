@@ -19,6 +19,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import type { Post } from '../types/content';
 import { createPost, getPosts } from '../api/postsApi';
+import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import CreatePostDialog from '../components/posts/CreatePostDialog';
 
@@ -38,8 +39,8 @@ export default function PostsPage() {
       const data = await getPosts();
       // Most recently updated first; a stable, predictable ordering for the list.
       setPosts([...data].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
-    } catch {
-      setLoadError('Could not load posts. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load posts. Is the API reachable?'));
     } finally {
       setLoading(false);
     }
@@ -55,8 +56,8 @@ export default function PostsPage() {
       const post = await createPost(payload);
       setCreating(false);
       navigate(`/posts/${post.id}`);
-    } catch {
-      setToast('Could not create the post. The slug may already be in use.');
+    } catch (err) {
+      setToast(serverMessage(err, 'Could not create the post. The slug may already be in use.'));
     } finally {
       setSavingCreate(false);
     }

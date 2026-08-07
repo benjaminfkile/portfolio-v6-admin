@@ -30,6 +30,7 @@ import {
 import RestoreIcon from '@mui/icons-material/Restore';
 import type { Version } from '../types/admin';
 import { getVersions, restoreVersion } from '../api/versionsApi';
+import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -49,8 +50,8 @@ export default function VersionsPage() {
       const list = await getVersions();
       // Newest-first regardless of the order the API returns them in (§4.2).
       setVersions([...list].sort((a, b) => b.version - a.version));
-    } catch {
-      setLoadError('Could not load the version history. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load the version history. Is the API reachable?'));
     } finally {
       setLoading(false);
     }
@@ -69,8 +70,8 @@ export default function VersionsPage() {
       setTarget(null);
       setToast(`Restored version ${v}. The working set was reset to it.`);
       await load();
-    } catch {
-      setToast(`Could not restore version ${v}.`);
+    } catch (err) {
+      setToast(serverMessage(err, `Could not restore version ${v}.`));
     } finally {
       setRestoring(false);
     }

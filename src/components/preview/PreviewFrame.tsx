@@ -24,6 +24,7 @@ import {
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { mintPreviewToken } from '../../api/previewApi';
+import { serverMessage } from '../../api/serverMessage';
 
 interface PreviewFrameProps {
   /** Builds the iframe `src` from a freshly minted token — the §7 URL contract. */
@@ -43,8 +44,8 @@ export default function PreviewFrame({ buildUrl, title }: PreviewFrameProps) {
     try {
       const minted = await mintPreviewToken();
       setToken(minted.token);
-    } catch {
-      setError('Could not mint a preview token. Is the API reachable?');
+    } catch (err) {
+      setError(serverMessage(err, 'Could not mint a preview token. Is the API reachable?'));
       setToken(null);
     } finally {
       setLoading(false);

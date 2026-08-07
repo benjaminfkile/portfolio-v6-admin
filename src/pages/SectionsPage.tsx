@@ -33,6 +33,7 @@ import {
   updateSection,
 } from '../api/sectionsApi';
 import { getPages } from '../api/pagesApi';
+import { serverMessage } from '../api/serverMessage';
 import SortableList, { type DragHandleProps } from '../components/dnd/SortableList';
 import SectionCard from '../components/sections/SectionCard';
 import CreateSectionDialog from '../components/sections/CreateSectionDialog';
@@ -94,8 +95,8 @@ export default function SectionsPage() {
       } else {
         setSections([]);
       }
-    } catch {
-      setLoadError('Could not load the working set. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load the working set. Is the API reachable?'));
     } finally {
       setLoading(false);
     }
@@ -118,8 +119,8 @@ export default function SectionsPage() {
     try {
       await reorderSections(selectedPageId, orderedIds);
       await refetch();
-    } catch {
-      setToast('Could not save the new order.');
+    } catch (err) {
+      setToast(serverMessage(err, 'Could not save the new order.'));
       await refetch();
     }
   };
@@ -130,8 +131,8 @@ export default function SectionsPage() {
     try {
       await createSection(type, { ...getSectionTypeDef(type).defaultData }, selectedPageId);
       await refetch();
-    } catch {
-      setToast('Could not create the section.');
+    } catch (err) {
+      setToast(serverMessage(err, 'Could not create the section.'));
     }
   };
 
@@ -149,7 +150,7 @@ export default function SectionsPage() {
       if (err instanceof ConflictError) {
         setConflictOpen(true);
       } else {
-        setToast('Could not move the section.');
+        setToast(serverMessage(err, 'Could not move the section.'));
       }
     }
   };
@@ -166,7 +167,7 @@ export default function SectionsPage() {
       if (err instanceof ConflictError) {
         setConflictOpen(true);
       } else {
-        setToast('Could not save the section.');
+        setToast(serverMessage(err, 'Could not save the section.'));
       }
     } finally {
       setSaving(false);
@@ -184,7 +185,7 @@ export default function SectionsPage() {
       if (err instanceof ConflictError) {
         setConflictOpen(true);
       } else {
-        setToast('Could not update visibility.');
+        setToast(serverMessage(err, 'Could not update visibility.'));
       }
     }
   };
@@ -195,9 +196,9 @@ export default function SectionsPage() {
       await deleteSection(deleting.id);
       setDeleting(null);
       await refetch();
-    } catch {
+    } catch (err) {
       setDeleting(null);
-      setToast('Could not delete the section.');
+      setToast(serverMessage(err, 'Could not delete the section.'));
     }
   };
 

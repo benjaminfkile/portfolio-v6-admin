@@ -17,6 +17,7 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import { deleteMedia, getMedia, runSweep } from '../api/mediaApi';
+import { serverMessage } from '../api/serverMessage';
 import type { MediaAsset } from '../types/media';
 import { isOrphaned } from '../lib/media';
 import MediaGrid from '../components/media/MediaGrid';
@@ -43,8 +44,8 @@ export default function MediaPage() {
     setLoadError('');
     try {
       await refetch();
-    } catch {
-      setLoadError('Could not load the media library. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load the media library. Is the API reachable?'));
     } finally {
       setLoading(false);
     }
@@ -58,8 +59,8 @@ export default function MediaPage() {
     setToast('Upload complete.');
     try {
       await refetch();
-    } catch {
-      setToast('Uploaded, but could not refresh the library.');
+    } catch (err) {
+      setToast(serverMessage(err, 'Uploaded, but could not refresh the library.'));
     }
   };
 
@@ -69,9 +70,9 @@ export default function MediaPage() {
       await deleteMedia(deleting.id);
       setDeleting(null);
       await refetch();
-    } catch {
+    } catch (err) {
       setDeleting(null);
-      setToast('Could not delete the asset.');
+      setToast(serverMessage(err, 'Could not delete the asset.'));
     }
   };
 
@@ -83,8 +84,8 @@ export default function MediaPage() {
         `Sweep complete — ${result.orphaned} orphaned, ${result.rescued} rescued, ${result.deleted} deleted.`,
       );
       await refetch();
-    } catch {
-      setToast('Could not run the sweep.');
+    } catch (err) {
+      setToast(serverMessage(err, 'Could not run the sweep.'));
     } finally {
       setSweeping(false);
     }
