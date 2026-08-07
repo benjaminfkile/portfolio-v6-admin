@@ -261,15 +261,6 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     fields: [
       { key: 'heading', label: 'Heading', kind: 'text' },
       { key: 'intro', label: 'Intro', kind: 'multiline', helperText: 'Optional lead-in text shown under the heading' },
-      {
-        key: 'window_hours',
-        label: 'Lookback window (hours)',
-        kind: 'number',
-        min: 1,
-        max: 24,
-        integer: true,
-        helperText: '1–24; defaults to 3',
-      },
     ],
     defaultData: {},
   },
