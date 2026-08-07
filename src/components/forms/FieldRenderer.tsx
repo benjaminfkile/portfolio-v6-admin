@@ -10,6 +10,7 @@ import type { Link } from '../../types/content';
 import LinkEditor from './LinkEditor';
 import StringListField from './StringListField';
 import MediaIdField from './MediaIdField';
+import IconSourceField from './IconSourceField';
 
 interface FieldRendererProps {
   field: FieldDef;
@@ -110,6 +111,17 @@ export default function FieldRenderer({ field, value, onChange }: FieldRendererP
           required={field.required}
           value={(value as string) ?? ''}
           onChange={(id) => set(id)}
+          helperText={field.helperText}
+        />
+      );
+
+    case 'icon':
+      return (
+        <IconSourceField
+          label={field.label}
+          required={field.required}
+          value={(value as string) ?? ''}
+          onChange={(v) => set(v)}
           helperText={field.helperText}
         />
       );

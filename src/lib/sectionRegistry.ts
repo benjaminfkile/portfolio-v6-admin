@@ -19,6 +19,7 @@ export type FieldKind =
   | 'boolean'
   | 'select'
   | 'media'
+  | 'icon'
   | 'links'
   | 'stringList';
 
@@ -117,7 +118,21 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     itemFields: [
       { key: 'title', label: 'Title', kind: 'text', required: true },
       { key: 'description', label: 'Description', kind: 'multiline', required: true },
-      { key: 'icon_source', label: 'Icon source', kind: 'text', required: true },
+      {
+        key: 'icon_source',
+        label: 'Icon',
+        kind: 'icon',
+        required: true,
+        helperText: 'Default (light-theme) icon. Pick from devicon or enter a URL.',
+      },
+      {
+        key: 'icon_source_dark',
+        label: 'Dark theme icon',
+        kind: 'icon',
+        helperText:
+          'Optional dark-theme override — falls back to the default icon when empty. ' +
+          'Use for a lighter/tintable variant that stays visible on dark.',
+      },
     ],
     defaultData: {},
     defaultItemData: { title: '', description: '', icon_source: '' },

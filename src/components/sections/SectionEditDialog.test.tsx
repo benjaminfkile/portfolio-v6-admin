@@ -99,7 +99,7 @@ describe('SectionEditDialog — save gating', () => {
 });
 
 describe('ItemEditDialog — renders item fields for item-bearing types (§3.4)', () => {
-  it('renders skill item fields (title/description/icon_source) with no proficiency input (v1.5)', () => {
+  it('renders skill item fields (title/description/icon + dark icon) with no proficiency input (v1.5)', () => {
     const def = getSectionTypeDef('skills');
     render(
       <ItemEditDialog
@@ -115,7 +115,9 @@ describe('ItemEditDialog — renders item fields for item-bearing types (§3.4)'
 
     expect(screen.getAllByText('Title').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Description').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Icon source').length).toBeGreaterThan(0);
+    // Icons v1.6: the default icon field plus the optional dark-theme override.
+    expect(screen.getAllByText('Icon').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Dark theme icon').length).toBeGreaterThan(0);
     // Proficiency was removed from the product in v1.5.
     expect(screen.queryByText(/proficiency/i)).not.toBeInTheDocument();
   });

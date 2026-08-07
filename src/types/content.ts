@@ -157,10 +157,17 @@ export interface TimelineItemData {
   media_id?: string;
 }
 
+/**
+ * skills item (§3.4, Icons v1.6). `icon_source` is the default (light-theme) icon URL,
+ * required as today. `icon_source_dark` is an OPTIONAL dark-theme override URL; every
+ * renderer falls back to `icon_source` when it is absent. Both are plain URL strings —
+ * source-agnostic (devicon, simpleicons, custom, self-hosted).
+ */
 export interface SkillItemData {
   title: string;
   description: string;
   icon_source: string;
+  icon_source_dark?: string;
 }
 
 export interface PortfolioItemData {
