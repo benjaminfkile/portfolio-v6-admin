@@ -135,13 +135,12 @@ export interface GithubData {
 }
 
 /**
- * ops — live section (§3.5, v1.3): config only. Metric lookback window; telemetry
- * fetched from `GET /api/ops` at runtime.
+ * ops — live section (§3.5, v1.7 daily replay): config only. Heading + optional intro;
+ * the immutable daily report is fetched from `GET /api/ops` at runtime.
  */
 export interface OpsData {
   heading?: string;
   intro?: string;
-  window_hours?: number;
 }
 
 /** contact — static section (no items). */
