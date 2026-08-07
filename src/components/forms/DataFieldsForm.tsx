@@ -44,7 +44,13 @@ export function validateData(fields: FieldDef[], data: Record<string, unknown>):
   const problems: string[] = [];
   for (const field of fields) {
     const value = data[field.key];
-    if (field.required && (field.kind === 'text' || field.kind === 'multiline' || field.kind === 'select')) {
+    if (
+      field.required &&
+      (field.kind === 'text' ||
+        field.kind === 'multiline' ||
+        field.kind === 'select' ||
+        field.kind === 'icon')
+    ) {
       if (!String(value ?? '').trim()) {
         problems.push(`${field.label} is required`);
       }
