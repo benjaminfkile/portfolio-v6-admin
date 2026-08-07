@@ -65,9 +65,16 @@ export interface TimelineData {
   title?: string;
 }
 
-/** skills — optional heading; entries live in `section_items` (§3.4). */
+/**
+ * skills — optional heading; entries live in `section_items` (§3.4). `sphere_detail` is the
+ * three.js `IcosahedronGeometry` detail parameter for the public geodesic-sphere renderer
+ * (v1.5): an optional integer 0–4 whose face count is 20·(detail+1)² → 20/80/180/320/500.
+ * Absent = AUTO: the renderer picks the smallest detail whose face count ≥ the number of
+ * skill items (clamped to 4).
+ */
 export interface SkillsData {
   title?: string;
+  sphere_detail?: number;
 }
 
 /** portfolio — optional heading/intro; projects live in `section_items` (§3.4). */
@@ -152,7 +159,6 @@ export interface SkillItemData {
   title: string;
   description: string;
   icon_source: string;
-  proficiency: number;
 }
 
 export interface PortfolioItemData {
