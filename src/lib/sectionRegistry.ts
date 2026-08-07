@@ -92,16 +92,25 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     type: 'skills',
     label: 'Skills',
     hasItems: true,
-    fields: [{ key: 'title', label: 'Heading', kind: 'text' }],
+    fields: [
+      { key: 'title', label: 'Heading', kind: 'text' },
+      {
+        key: 'sphere_detail',
+        label: 'Sphere detail (0–4)',
+        kind: 'number',
+        helperText:
+          'Geodesic sphere density — face count 20/80/180/320/500. ' +
+          'Leave blank to auto-fit to the number of skills.',
+      },
+    ],
     itemNoun: 'skill',
     itemFields: [
       { key: 'title', label: 'Title', kind: 'text', required: true },
       { key: 'description', label: 'Description', kind: 'multiline', required: true },
       { key: 'icon_source', label: 'Icon source', kind: 'text', required: true },
-      { key: 'proficiency', label: 'Proficiency (0–100)', kind: 'number', required: true },
     ],
     defaultData: {},
-    defaultItemData: { title: '', description: '', icon_source: '', proficiency: 0 },
+    defaultItemData: { title: '', description: '', icon_source: '' },
   },
   portfolio: {
     type: 'portfolio',

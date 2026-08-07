@@ -43,6 +43,31 @@ describe('SectionEditDialog — renders the right fields per section type (§3.4
   });
 });
 
+describe('SectionEditDialog — skills sphere_detail (v1.5)', () => {
+  it('exposes an optional sphere_detail field and stays saveable when it is blank', () => {
+    const skills = getSectionTypeDef('skills');
+    const sphereField = skills.fields.find((f) => f.key === 'sphere_detail');
+    expect(sphereField).toBeDefined();
+    expect(sphereField!.required).toBeFalsy();
+    expect(sphereField!.kind).toBe('number');
+
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection('skills')}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // The section field surfaces in the editor…
+    expect(screen.getAllByText(sphereField!.label).length).toBeGreaterThan(0);
+    // …and since it is optional, Save is not gated on it.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+});
+
 describe('SectionEditDialog — save gating', () => {
   it('disables Save while a required field is empty and enables it once filled', () => {
     const onSave = vi.fn();
@@ -74,6 +99,27 @@ describe('SectionEditDialog — save gating', () => {
 });
 
 describe('ItemEditDialog — renders item fields for item-bearing types (§3.4)', () => {
+  it('renders skill item fields (title/description/icon_source) with no proficiency input (v1.5)', () => {
+    const def = getSectionTypeDef('skills');
+    render(
+      <ItemEditDialog
+        open
+        title="Add skill"
+        fields={def.itemFields!}
+        initialData={{ ...def.defaultItemData }}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText('Title').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Description').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Icon source').length).toBeGreaterThan(0);
+    // Proficiency was removed from the product in v1.5.
+    expect(screen.queryByText(/proficiency/i)).not.toBeInTheDocument();
+  });
+
   it('renders portfolio item fields including the Links editor and a media picker', () => {
     const def = getSectionTypeDef('portfolio');
     render(
