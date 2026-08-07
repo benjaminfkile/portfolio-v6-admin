@@ -85,7 +85,10 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     type: 'timeline',
     label: 'Timeline',
     hasItems: true,
-    fields: [{ key: 'heading', label: 'Heading', kind: 'text' }],
+    fields: [
+      { key: 'heading', label: 'Heading', kind: 'text' },
+      { key: 'intro', label: 'Intro', kind: 'multiline', helperText: 'Optional lead-in text shown under the heading' },
+    ],
     itemNoun: 'entry',
     itemFields: [
       { key: 'date_range', label: 'Date range', kind: 'text', required: true },
@@ -102,6 +105,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     hasItems: true,
     fields: [
       { key: 'heading', label: 'Heading', kind: 'text' },
+      { key: 'intro', label: 'Intro', kind: 'multiline', helperText: 'Optional lead-in text shown under the heading' },
       {
         key: 'sphere_detail',
         label: 'Sphere detail (0–4)',
@@ -212,6 +216,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     hasItems: false,
     fields: [
       { key: 'heading', label: 'Heading', kind: 'text' },
+      { key: 'intro', label: 'Intro', kind: 'multiline', helperText: 'Optional lead-in text shown under the heading' },
       {
         key: 'language',
         label: 'Course language',
@@ -236,6 +241,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     hasItems: false,
     fields: [
       { key: 'heading', label: 'Heading', kind: 'text' },
+      { key: 'intro', label: 'Intro', kind: 'multiline', helperText: 'Optional lead-in text shown under the heading' },
       {
         key: 'weeks',
         label: 'Weeks of history',
@@ -254,6 +260,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     hasItems: false,
     fields: [
       { key: 'heading', label: 'Heading', kind: 'text' },
+      { key: 'intro', label: 'Intro', kind: 'multiline', helperText: 'Optional lead-in text shown under the heading' },
       {
         key: 'window_hours',
         label: 'Lookback window (hours)',

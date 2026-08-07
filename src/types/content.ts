@@ -119,6 +119,7 @@ export interface NowPlayingData {
  */
 export interface DuolingoData {
   heading?: string;
+  intro?: string;
   language: string;
   score_label?: string;
 }
@@ -129,6 +130,7 @@ export interface DuolingoData {
  */
 export interface GithubData {
   heading?: string;
+  intro?: string;
   weeks?: number;
 }
 
@@ -138,6 +140,7 @@ export interface GithubData {
  */
 export interface OpsData {
   heading?: string;
+  intro?: string;
   window_hours?: number;
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import SectionEditDialog from './SectionEditDialog';
 import ItemEditDialog from './ItemEditDialog';
 import { SECTION_TYPE_LIST, getSectionTypeDef } from '../../lib/sectionRegistry';
@@ -40,6 +41,62 @@ describe('SectionEditDialog — renders the right fields per section type (§3.4
     for (const field of def.fields) {
       expect(screen.getAllByText(field.label).length).toBeGreaterThan(0);
     }
+  });
+});
+
+// Intro v1.6b: every intro-capable section exposes an optional `intro` multiline lead-in
+// rendered directly under the heading. about/contact are excluded — their `body` already is
+// the text under the heading.
+const INTRO_TYPES: SectionType[] = ['timeline', 'skills', 'portfolio', 'duolingo', 'github', 'ops'];
+
+describe('SectionEditDialog — intro field under the heading (Intro v1.6b)', () => {
+  it.each(INTRO_TYPES)('exposes an optional multiline "intro" field for "%s"', (type) => {
+    const def = getSectionTypeDef(type);
+    const headingIdx = def.fields.findIndex((f) => f.key === 'heading');
+    const introIdx = def.fields.findIndex((f) => f.key === 'intro');
+    const intro = def.fields[introIdx];
+
+    // The key is exactly `intro`, the kind is multiline, and it is optional (schemas are
+    // .strict(), so the key must match the zod schema — never a near-miss like `lead`).
+    expect(intro).toBeDefined();
+    expect(intro.kind).toBe('multiline');
+    expect(intro.required).toBeFalsy();
+    // Placed directly after the heading field.
+    expect(introIdx).toBe(headingIdx + 1);
+
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection(type)}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText('Intro').length).toBeGreaterThan(0);
+    // Optional, so Save is never gated on it.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('saves the entered intro text under exactly the key `intro`', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection('github')}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Intro'), 'A quick lead-in.');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0]).toMatchObject({ intro: 'A quick lead-in.' });
   });
 });
 
