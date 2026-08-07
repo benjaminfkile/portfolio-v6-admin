@@ -14,7 +14,6 @@
  * Themed via MUI only (§14.4).
  */
 import { useCallback, useEffect, useState } from 'react';
-import axios from 'axios';
 import {
   Alert,
   Box,
@@ -39,15 +38,7 @@ import PageRow, { HOME_SLUG } from '../components/pages/PageRow';
 import PageFormDialog, { type PageFormValues } from '../components/pages/PageFormDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ConflictDialog from '../components/ConflictDialog';
-
-/** Pull a human-readable message out of a rejected write for inline display. */
-function serverMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const body = err.response?.data as { errorMsg?: string } | undefined;
-    if (body?.errorMsg) return body.errorMsg;
-  }
-  return fallback;
-}
+import { serverMessage } from '../api/serverMessage';
 
 export default function PagesPage() {
   const [pages, setPages] = useState<Page[]>([]);
@@ -72,8 +63,8 @@ export default function PagesPage() {
     setLoadError('');
     try {
       await refetch();
-    } catch {
-      setLoadError('Could not load the pages. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load the pages. Is the API reachable?'));
     } finally {
       setLoading(false);
     }
@@ -90,8 +81,8 @@ export default function PagesPage() {
     try {
       await reorderPages(orderedIds);
       await refetch();
-    } catch {
-      setToast('Could not save the new order.');
+    } catch (err) {
+      setToast(serverMessage(err, 'Could not save the new order.'));
       await refetch();
     }
   };
@@ -152,7 +143,7 @@ export default function PagesPage() {
       if (err instanceof ConflictError) {
         setConflictOpen(true);
       } else {
-        setToast('Could not update visibility.');
+        setToast(serverMessage(err, 'Could not update visibility.'));
       }
     }
   };
@@ -169,9 +160,9 @@ export default function PagesPage() {
       setDeleting(null);
       await refetch();
       setToast('Page and its sections deleted.');
-    } catch {
+    } catch (err) {
       setDeleting(null);
-      setToast('Could not delete the page.');
+      setToast(serverMessage(err, 'Could not delete the page.'));
     }
   };
 

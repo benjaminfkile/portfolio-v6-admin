@@ -32,6 +32,7 @@ import {
   Typography,
 } from '@mui/material';
 import { getAnalytics, fillDailyGaps } from '../api/analyticsApi';
+import { serverMessage } from '../api/serverMessage';
 import type { AnalyticsRange, AnalyticsSummary } from '../types/admin';
 import DailyChart from '../components/analytics/DailyChart';
 
@@ -129,8 +130,8 @@ export default function AnalyticsPage() {
     setLoadError('');
     try {
       setSummary(await getAnalytics(range));
-    } catch {
-      setLoadError('Could not load analytics. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load analytics. Is the API reachable?'));
     } finally {
       setLoading(false);
     }

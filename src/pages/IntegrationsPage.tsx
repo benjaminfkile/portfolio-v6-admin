@@ -42,6 +42,7 @@ import {
   saveIntegrationValue,
 } from '../api/integrationsApi';
 import type { Integration } from '../api/integrationsApi';
+import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -86,8 +87,8 @@ function OAuthCard({ integration, onReload, onToast }: CardProps) {
       const authorizeUrl = await connectIntegration(key, returnTo);
       // Leave the app: the provider's consent page, then back via the API callback.
       window.location.assign(authorizeUrl);
-    } catch {
-      onToast(`Could not start the ${name} connection. Is the API reachable?`);
+    } catch (err) {
+      onToast(serverMessage(err, `Could not start the ${name} connection. Is the API reachable?`));
       setConnecting(false);
     }
   };
@@ -99,8 +100,8 @@ function OAuthCard({ integration, onReload, onToast }: CardProps) {
       setConfirmDisconnect(false);
       onToast(`${name} was disconnected.`);
       await onReload();
-    } catch {
-      onToast(`Could not disconnect ${name}.`);
+    } catch (err) {
+      onToast(serverMessage(err, `Could not disconnect ${name}.`));
     } finally {
       setDisconnecting(false);
     }
@@ -209,8 +210,8 @@ function CredentialCard({ integration, onReload, onToast }: CardProps) {
       setDraft('');
       onToast(`${name} saved.`);
       await onReload();
-    } catch {
-      onToast(`Could not save ${name}.`);
+    } catch (err) {
+      onToast(serverMessage(err, `Could not save ${name}.`));
     } finally {
       setSaving(false);
     }
@@ -223,8 +224,8 @@ function CredentialCard({ integration, onReload, onToast }: CardProps) {
       setConfirmDisconnect(false);
       onToast(`${name} was disconnected.`);
       await onReload();
-    } catch {
-      onToast(`Could not disconnect ${name}.`);
+    } catch (err) {
+      onToast(serverMessage(err, `Could not disconnect ${name}.`));
     } finally {
       setDisconnecting(false);
     }
@@ -312,8 +313,8 @@ export default function IntegrationsPage() {
     setLoadError('');
     try {
       setIntegrations(await getIntegrations());
-    } catch {
-      setLoadError('Could not load the integrations. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load the integrations. Is the API reachable?'));
     } finally {
       setLoading(false);
     }

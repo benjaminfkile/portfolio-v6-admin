@@ -2,12 +2,27 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { AxiosError } from 'axios';
 import type { ReactNode } from 'react';
 import SectionsPage from './SectionsPage';
 import { ConflictError } from '../api/sectionsApi';
 import * as api from '../api/sectionsApi';
 import * as pagesApi from '../api/pagesApi';
 import type { AdminSection, Page } from '../types/admin';
+
+/** A rejected write carrying the §4.3 error envelope, as axios surfaces it. */
+function envelopeError(status: number, errorMsg: string): AxiosError {
+  const err = new AxiosError('Request failed with status code ' + status);
+  err.response = {
+    status,
+    statusText: '',
+    headers: {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    config: {} as any,
+    data: { error: true, errorMsg },
+  };
+  return err;
+}
 
 // Mock the API module but keep the real ConflictError class (the page checks
 // `err instanceof ConflictError`).
@@ -194,6 +209,42 @@ describe('SectionsPage', () => {
       expect(screen.queryByText(/changed since you loaded it/i)).not.toBeInTheDocument(),
     );
     expect(api.getSections).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces the server's errorMsg in the failure toast when a save is rejected with an envelope", async () => {
+    const user = userEvent.setup();
+    // A 400 with a specific reason (e.g. a zod validation detail) — exactly what used to be
+    // dropped in favour of the generic "Could not save the section." string.
+    vi.mocked(api.updateSection).mockRejectedValueOnce(
+      envelopeError(400, 'Invalid data: sphere_detail must be between 1 and 100.'),
+    );
+
+    renderPage();
+    await screen.findByTestId('section-card');
+
+    await user.click(screen.getByRole('button', { name: /edit hero/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^save$/i }));
+
+    // The server's reason reaches the toast verbatim, not the generic fallback.
+    expect(
+      await screen.findByText(/invalid data: sphere_detail must be between 1 and 100\./i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Could not save the section.')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the generic toast when the save fails with no envelope (network error)', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.updateSection).mockRejectedValueOnce(new Error('Network Error'));
+
+    renderPage();
+    await screen.findByTestId('section-card');
+
+    await user.click(screen.getByRole('button', { name: /edit hero/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^save$/i }));
+
+    expect(await screen.findByText('Could not save the section.')).toBeInTheDocument();
   });
 
 });

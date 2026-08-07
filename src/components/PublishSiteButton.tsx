@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import PublishIcon from '@mui/icons-material/Publish';
 import { PublishValidationError, publishSite } from '../api/versionsApi';
+import { serverMessage } from '../api/serverMessage';
 
 export default function PublishSiteButton() {
   const [open, setOpen] = useState(false);
@@ -44,7 +45,7 @@ export default function PublishSiteButton() {
         setIssues([err.message, ...err.issues]);
       } else {
         setOpen(false);
-        setToast('Could not publish the site. Is the API reachable?');
+        setToast(serverMessage(err, 'Could not publish the site. Is the API reachable?'));
       }
     } finally {
       setPublishing(false);

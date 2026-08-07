@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { getMedia } from '../../api/mediaApi';
+import { serverMessage } from '../../api/serverMessage';
 import type { MediaAsset } from '../../types/media';
 import MediaGrid from './MediaGrid';
 import UploadDialog from './UploadDialog';
@@ -59,8 +60,8 @@ export default function MediaPicker({ open, selectedId, onClose, onSelect }: Med
       const preselected = usable.find((a) => a.id === selectedId) ?? null;
       setChosen(preselected);
       setAlt(preselected?.alt ?? '');
-    } catch {
-      setLoadError('Could not load the media library. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load the media library. Is the API reachable?'));
     } finally {
       setLoading(false);
     }

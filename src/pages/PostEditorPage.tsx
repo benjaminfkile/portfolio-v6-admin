@@ -44,6 +44,7 @@ import {
   unpublishPost,
   updatePost,
 } from '../api/postsApi';
+import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import BlockEditor from '../components/posts/BlockEditor';
 import PostMetadataEditor, {
@@ -102,8 +103,8 @@ export default function PostEditorPage() {
     setLoadError('');
     try {
       seed(await getPost(id));
-    } catch {
-      setLoadError('Could not load this post. Is the API reachable?');
+    } catch (err) {
+      setLoadError(serverMessage(err, 'Could not load this post. Is the API reachable?'));
     } finally {
       setLoading(false);
     }
@@ -142,7 +143,7 @@ export default function PostEditorPage() {
       if (err instanceof ConflictError) {
         setConflictOpen(true);
       } else {
-        setToast('Could not save the draft.');
+        setToast(serverMessage(err, 'Could not save the draft.'));
       }
     } finally {
       setSaving(false);
@@ -161,7 +162,7 @@ export default function PostEditorPage() {
       if (err instanceof PostValidationError) {
         setValidationIssues([err.message, ...err.issues]);
       } else {
-        setToast('Could not publish the post.');
+        setToast(serverMessage(err, 'Could not publish the post.'));
       }
     } finally {
       setPublishing(false);
@@ -175,8 +176,8 @@ export default function PostEditorPage() {
     try {
       seed(await unpublishPost(post.id));
       setToast('Post unpublished.');
-    } catch {
-      setToast('Could not unpublish the post.');
+    } catch (err) {
+      setToast(serverMessage(err, 'Could not unpublish the post.'));
     } finally {
       setPublishing(false);
     }

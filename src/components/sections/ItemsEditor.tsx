@@ -28,6 +28,7 @@ import {
   reorderItems,
   updateItem,
 } from '../../api/sectionsApi';
+import { serverMessage } from '../../api/serverMessage';
 import SortableList, { type DragHandleProps } from '../dnd/SortableList';
 import ItemEditDialog from './ItemEditDialog';
 import ConfirmDialog from '../ConfirmDialog';
@@ -70,8 +71,8 @@ export default function ItemsEditor({
     try {
       await reorderItems(section.id, orderedIds);
       await onChanged();
-    } catch {
-      onError('Could not reorder items.');
+    } catch (err) {
+      onError(serverMessage(err, 'Could not reorder items.'));
     }
   };
 
@@ -93,7 +94,7 @@ export default function ItemsEditor({
       if (err instanceof ConflictError) {
         onConflict();
       } else {
-        onError('Could not save the item.');
+        onError(serverMessage(err, 'Could not save the item.'));
       }
     } finally {
       setSaving(false);
@@ -106,9 +107,9 @@ export default function ItemsEditor({
       await deleteItem(deleting.id);
       setDeleting(null);
       await onChanged();
-    } catch {
+    } catch (err) {
       setDeleting(null);
-      onError('Could not delete the item.');
+      onError(serverMessage(err, 'Could not delete the item.'));
     }
   };
 
