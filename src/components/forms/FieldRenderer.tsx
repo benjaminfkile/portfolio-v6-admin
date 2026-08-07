@@ -15,10 +15,12 @@ import IconSourceField from './IconSourceField';
 interface FieldRendererProps {
   field: FieldDef;
   value: unknown;
+  /** The full data blob this field lives in — lets a dark icon field read its light sibling. */
+  data?: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
 }
 
-export default function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
+export default function FieldRenderer({ field, value, data, onChange }: FieldRendererProps) {
   const set = (v: unknown) => onChange(field.key, v);
 
   switch (field.kind) {
@@ -123,6 +125,10 @@ export default function FieldRenderer({ field, value, onChange }: FieldRendererP
           value={(value as string) ?? ''}
           onChange={(v) => set(v)}
           helperText={field.helperText}
+          dark={field.dark}
+          lightIconUrl={
+            field.lightSourceKey ? (data?.[field.lightSourceKey] as string | undefined) : undefined
+          }
         />
       );
 
