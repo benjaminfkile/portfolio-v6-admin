@@ -14,8 +14,10 @@
  *     purpose), and import `{ source:'simpleicons', slug, color }`.
  *   • "Devicon" — the unchanged catalog flow above, for coloured logos that read on dark.
  *
- * Preview icons load from a CDN (jsDelivr for devicon, cdn.simpleicons.org for tints); the
- * value actually stored is always the imported media-CDN URL. Styling is MUI theme + `sx`.
+ * Preview icons load from jsDelivr at each catalog's PINNED release (devicon variants raw;
+ * simple-icons tinted client-side into data URIs — never live cdn.simpleicons.org, which 404s
+ * icons removed upstream since the pin). The value actually stored is always the imported
+ * media-CDN URL. Styling is MUI theme + `sx`.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -43,7 +45,7 @@ import {
   isValidHexColor,
   searchIcons,
   searchSimpleIcons,
-  simpleIconPreviewUrl,
+  fetchTintedSimpleIcon,
   type DeviconIcon,
   type DeviconManifest,
   type SimpleIcon,
@@ -82,6 +84,70 @@ const DARK_INK_PRESETS: { label: string; hex: string }[] = [
 ];
 
 type PickerTab = 'tinted' | 'devicon';
+
+/**
+ * A tinted simple-icon preview resolved from the PINNED release via
+ * `fetchTintedSimpleIcon` (jsDelivr raw + client-side tint → data URI). Not
+ * cdn.simpleicons.org: the live CDN 404s icons that upstream has removed since
+ * the pin (every AWS icon, post-takedown), while the pinned source always
+ * matches the catalog the grid is showing. A failed fetch renders a muted "—"
+ * placeholder box instead of a broken image.
+ */
+function TintedIcon({
+  version,
+  slug,
+  color,
+  size,
+  alt = '',
+}: {
+  version: string;
+  slug: string;
+  color: string;
+  size: number;
+  alt?: string;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setSrc(null);
+    setFailed(false);
+    fetchTintedSimpleIcon(version, slug, color).then((uri) => {
+      if (!alive) return;
+      if (uri === null) setFailed(true);
+      else setSrc(uri);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [version, slug, color]);
+
+  if (failed) {
+    return (
+      <Box
+        aria-hidden
+        sx={{
+          width: size,
+          height: size,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'text.disabled',
+        }}
+      >
+        —
+      </Box>
+    );
+  }
+  return (
+    <Box
+      component="img"
+      src={src ?? undefined}
+      alt={alt}
+      sx={{ width: size, height: size, objectFit: 'contain' }}
+    />
+  );
+}
 
 export default function IconPicker({
   open,
@@ -431,12 +497,11 @@ export default function IconPicker({
                       gap: 0.5,
                     }}
                   >
-                    <Box
-                      component="img"
-                      crossOrigin="anonymous"
-                      src={simpleIconPreviewUrl(icon.slug, colorValid ? color : 'EDF1F7')}
-                      alt=""
-                      sx={{ width: 32, height: 32, objectFit: 'contain' }}
+                    <TintedIcon
+                      version={siManifest?.version ?? ''}
+                      slug={icon.slug}
+                      color={colorValid ? color : 'EDF1F7'}
+                      size={32}
                     />
                     <Typography
                       variant="caption"
@@ -502,12 +567,12 @@ export default function IconPicker({
                   data-testid="tint-preview"
                   sx={{ bgcolor: DARK_SWATCH, borderRadius: 1, p: 1.5, display: 'flex' }}
                 >
-                  <Box
-                    component="img"
-                    crossOrigin="anonymous"
-                    src={simpleIconPreviewUrl(siChosen.slug, colorValid ? color : 'EDF1F7')}
+                  <TintedIcon
+                    version={siManifest?.version ?? ''}
+                    slug={siChosen.slug}
+                    color={colorValid ? color : 'EDF1F7'}
+                    size={40}
                     alt={`${siChosen.title} tinted preview`}
-                    sx={{ width: 40, height: 40, objectFit: 'contain' }}
                   />
                 </Box>
               </Stack>

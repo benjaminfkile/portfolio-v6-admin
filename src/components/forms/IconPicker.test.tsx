@@ -13,8 +13,12 @@ vi.mock('../../api/iconsApi', async (importOriginal) => {
     importIcon: vi.fn(),
     getSimpleIconsManifest: vi.fn(),
     importSimpleIcon: vi.fn(),
+    fetchTintedSimpleIcon: vi.fn(),
   };
 });
+
+/** The data URI the mocked pinned-tint fetch resolves to (see beforeEach). */
+const TINT_DATA_URI = 'data:image/svg+xml;utf8,%3Csvg%20fill%3D%22%23abcdef%22%2F%3E';
 
 const ICONS: DeviconIcon[] = [
   { name: 'react', altnames: ['reactjs'], tags: ['ui'], versions: ['original', 'plain', 'line'], color: '#61DAFB' },
@@ -32,6 +36,7 @@ beforeEach(() => {
   vi.mocked(api.importIcon).mockResolvedValue('https://cdn.example.com/icons/devicon/react-original@v2.16.0.svg');
   vi.mocked(api.getSimpleIconsManifest).mockResolvedValue({ version: '13.0.0', icons: SIMPLE_ICONS });
   vi.mocked(api.importSimpleIcon).mockResolvedValue('https://cdn.example.com/icons/simpleicons/express-EDF1F7.svg');
+  vi.mocked(api.fetchTintedSimpleIcon).mockResolvedValue(TINT_DATA_URI);
 });
 
 describe('IconPicker', () => {
@@ -152,9 +157,14 @@ describe('IconPicker — dark override (tint-first, Icons v1.6.1)', () => {
     await user.clear(hex);
     await user.type(hex, 'abcdef');
 
-    // Preview uses cdn.simpleicons.org/<slug>/<hex>.
+    // Preview resolves through the PINNED tint pipeline (jsDelivr raw +
+    // client-side tint → data URI) — never live cdn.simpleicons.org, which
+    // 404s icons removed upstream since the pin (the AWS icons regression).
+    await waitFor(() =>
+      expect(api.fetchTintedSimpleIcon).toHaveBeenCalledWith('13.0.0', 'express', 'abcdef'),
+    );
     const preview = screen.getByTestId('tint-preview').querySelector('img');
-    expect(preview).toHaveAttribute('src', 'https://cdn.simpleicons.org/express/abcdef');
+    await waitFor(() => expect(preview).toHaveAttribute('src', TINT_DATA_URI));
 
     await user.click(screen.getByRole('button', { name: /use this icon/i }));
     await waitFor(() => expect(api.importSimpleIcon).toHaveBeenCalledWith('express', 'abcdef'));

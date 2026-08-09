@@ -129,12 +129,62 @@ export async function importSimpleIcon(slug: string, color: string): Promise<str
 }
 
 /**
- * Build a cdn.simpleicons.org URL for a tinted logo — PREVIEW ONLY. The CDN serves current
- * artwork at any colour; the stored value is always the imported media-CDN URL, never this.
- * `color` is a hex WITHOUT '#'.
+ * jsDelivr URL of the RAW simple-icon SVG at the PINNED release — the preview's
+ * download source. Previews deliberately do NOT use cdn.simpleicons.org: that CDN
+ * serves the CURRENT release, and icons present in the pinned catalog can 404
+ * there after upstream removals (Amazon's trademark takedowns pulled every AWS
+ * icon — the whole grid of them broke). jsDelivr at the manifest's own `version`
+ * always matches the catalog, and it is the same source the server-side import
+ * uses. `version` comes from the simpleicons manifest response.
  */
-export function simpleIconPreviewUrl(slug: string, color: string): string {
-  return `https://cdn.simpleicons.org/${slug}/${color}`;
+export function simpleIconRawUrl(version: string, slug: string): string {
+  return `https://cdn.jsdelivr.net/npm/simple-icons@${version}/icons/${slug}.svg`;
+}
+
+/**
+ * Tint a raw simple-icons SVG to `color` (hex, no '#') by setting `fill` on the
+ * root `<svg>` — the same rule the API's server-side import applies, so the
+ * preview and the stored artwork can never disagree. Replaces an existing root
+ * fill defensively.
+ */
+export function tintSimpleIconSvg(svg: string, color: string): string {
+  const fill = `fill="#${color.toLowerCase()}"`;
+  const root = svg.match(/<svg\b[^>]*>/);
+  if (!root) return svg;
+  const tinted = /\bfill="[^"]*"/.test(root[0])
+    ? root[0].replace(/\bfill="[^"]*"/, fill)
+    : root[0].replace(/^<svg\b/, `<svg ${fill}`);
+  return svg.replace(root[0], tinted);
+}
+
+/** Raw pinned SVG text per `version/slug`, so re-tints don't refetch. */
+const rawSvgCache = new Map<string, Promise<string | null>>();
+
+/**
+ * Fetch the pinned raw SVG (cached) and return a tinted `data:` URI for use as
+ * an `<img src>`, or `null` on any fetch failure (the caller renders a
+ * placeholder). Data URIs need no crossOrigin handling and cannot poison any
+ * shared HTTP cache.
+ */
+export async function fetchTintedSimpleIcon(
+  version: string,
+  slug: string,
+  color: string,
+): Promise<string | null> {
+  const key = `${version}/${slug}`;
+  let raw = rawSvgCache.get(key);
+  if (!raw) {
+    raw = fetch(simpleIconRawUrl(version, slug))
+      .then((r) => (r.ok ? r.text() : null))
+      .catch(() => null);
+    rawSvgCache.set(key, raw);
+  }
+  const svg = await raw;
+  if (svg === null) {
+    rawSvgCache.delete(key); // do not cache failures — allow a retry
+    return null;
+  }
+  return `data:image/svg+xml;utf8,${encodeURIComponent(tintSimpleIconSvg(svg, color))}`;
 }
 
 /** Case-insensitive search over the Simple Icons catalog by title and slug. */

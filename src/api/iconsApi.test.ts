@@ -11,7 +11,9 @@ import {
   isValidHexColor,
   searchIcons,
   searchSimpleIcons,
-  simpleIconPreviewUrl,
+  simpleIconRawUrl,
+  tintSimpleIconSvg,
+  fetchTintedSimpleIcon,
   type DeviconIcon,
   type SimpleIcon,
 } from './iconsApi';
@@ -148,11 +150,67 @@ describe('searchSimpleIcons — title/slug filtering', () => {
   });
 });
 
-describe('simpleIconPreviewUrl', () => {
-  it('builds the cdn.simpleicons.org tinted URL (hex without #)', () => {
-    expect(simpleIconPreviewUrl('express', 'EDF1F7')).toBe(
-      'https://cdn.simpleicons.org/express/EDF1F7',
+describe('simpleIconRawUrl', () => {
+  it('builds the PINNED jsDelivr raw-SVG URL (never live cdn.simpleicons.org)', () => {
+    expect(simpleIconRawUrl('13.21.0', 'express')).toBe(
+      'https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/express.svg',
     );
+  });
+});
+
+describe('tintSimpleIconSvg', () => {
+  it('injects a lowercased fill on the root svg', () => {
+    expect(tintSimpleIconSvg('<svg viewBox="0 0 24 24"><path d="M0 0"/></svg>', 'EDF1F7')).toBe(
+      '<svg fill="#edf1f7" viewBox="0 0 24 24"><path d="M0 0"/></svg>',
+    );
+  });
+
+  it('replaces an existing root fill', () => {
+    expect(tintSimpleIconSvg('<svg fill="#000"><path/></svg>', 'ABC')).toBe(
+      '<svg fill="#abc"><path/></svg>',
+    );
+  });
+});
+
+describe('fetchTintedSimpleIcon', () => {
+  it('fetches the pinned raw SVG once per slug and returns a tinted data URI', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '<svg><path/></svg>',
+    } as unknown as Response);
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const uri = await fetchTintedSimpleIcon('13.21.0', 'awslambda', 'EDF1F7');
+      expect(uri).toContain('data:image/svg+xml;utf8,');
+      expect(decodeURIComponent(uri!)).toContain('fill="#edf1f7"');
+      // Re-tint of the same slug reuses the cached raw SVG — no second fetch.
+      await fetchTintedSimpleIcon('13.21.0', 'awslambda', 'ABCDEF');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/awslambda.svg',
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns null on a failed fetch (caller shows a placeholder) without caching it', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => '<svg><path/></svg>',
+      } as unknown as Response);
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      expect(await fetchTintedSimpleIcon('13.21.0', 'gone', 'EDF1F7')).toBeNull();
+      // The failure was not cached — a retry refetches and succeeds.
+      expect(await fetchTintedSimpleIcon('13.21.0', 'gone', 'EDF1F7')).toContain('data:');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
