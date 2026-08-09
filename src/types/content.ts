@@ -172,6 +172,17 @@ export interface SkillItemData {
   icon_source_dark?: string;
 }
 
+/**
+ * portfolio item (§3.4, Skill Refs v1.8). `skill_refs` is an ordered array of skills
+ * `section_items.id` uuids — items of `skills`-type sections on ANY page — REPLACING v5's
+ * bare `tech_icons` URL array. Array order is render order; an empty array is allowed. The
+ * public site renders each referenced skill's theme-aware icon (incl. `icon_source_dark`)
+ * with the skill `title` as the accessible name, so portfolio marks and the skills sphere
+ * can never show mismatched icons — consistency is enforced by construction. Mirrors the
+ * API's zod schema exactly: it rejects `tech_icons` and requires each `skill_refs` entry to
+ * be a uuid; publish 422s on any ref that does not resolve to a non-hidden item of a
+ * non-hidden skills section (draft writes stay lenient).
+ */
 export interface PortfolioItemData {
   title: string;
   intro: string;
@@ -179,7 +190,7 @@ export interface PortfolioItemData {
   media_id: string;
   playback_rate?: number;
   transform_value?: string;
-  tech_icons: string[];
+  skill_refs: string[];
   links: Link[];
 }
 

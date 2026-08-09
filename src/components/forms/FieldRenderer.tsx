@@ -9,6 +9,7 @@ import type { FieldDef } from '../../lib/sectionRegistry';
 import type { Link } from '../../types/content';
 import LinkEditor from './LinkEditor';
 import StringListField from './StringListField';
+import SkillRefsField from './SkillRefsField';
 import MediaIdField from './MediaIdField';
 import IconSourceField from './IconSourceField';
 
@@ -104,6 +105,16 @@ export default function FieldRenderer({ field, value, data, onChange }: FieldRen
     case 'links':
       return (
         <LinkEditor value={(value as Link[]) ?? []} onChange={(next) => set(next)} />
+      );
+
+    case 'skillRefs':
+      return (
+        <SkillRefsField
+          label={field.label}
+          value={(value as string[]) ?? []}
+          onChange={(next) => set(next)}
+          helperText={field.helperText}
+        />
       );
 
     case 'media':

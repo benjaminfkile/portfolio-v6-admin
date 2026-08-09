@@ -21,6 +21,7 @@ export type FieldKind =
   | 'media'
   | 'icon'
   | 'links'
+  | 'skillRefs'
   | 'stringList';
 
 export interface FieldDef {
@@ -171,7 +172,13 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       { key: 'media_id', label: 'Media', kind: 'media', required: true },
       { key: 'playback_rate', label: 'Playback rate', kind: 'number', min: 0.1 },
       { key: 'transform_value', label: 'Transform value', kind: 'text' },
-      { key: 'tech_icons', label: 'Tech icons', kind: 'stringList' },
+      {
+        key: 'skill_refs',
+        label: 'Tech (from Skills)',
+        kind: 'skillRefs',
+        helperText:
+          'References skills from the Skills section — icons and names always match the sphere.',
+      },
       { key: 'links', label: 'Links', kind: 'links', helperText: LINK_HELPER },
     ],
     defaultData: {},
@@ -180,7 +187,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       intro: '',
       description: '',
       media_id: '',
-      tech_icons: [],
+      skill_refs: [],
       links: [],
     },
   },

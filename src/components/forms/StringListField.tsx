@@ -1,8 +1,10 @@
 /**
- * Editable list of plain strings — used for `status.services` and portfolio
- * `tech_icons[]` (§3.4). Rows can be edited, added, and removed. Order is not
- * semantically meaningful for these fields, so no drag handle here (unlike the Link
- * editor); a simple add/remove list is enough.
+ * Editable list of plain strings — used for `status.services` (§3.4). Rows can be edited,
+ * added, and removed. Order is not semantically meaningful for these fields, so no drag
+ * handle here (unlike the Link editor); a simple add/remove list is enough.
+ *
+ * (Portfolio's `tech_icons[]` was the other consumer until Skill Refs v1.8 replaced it with
+ * a `skill_refs` picker — see {@link SkillRefsField}.)
  */
 import { Box, Button, IconButton, Stack, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';

@@ -195,7 +195,9 @@ describe('ItemEditDialog — renders item fields for item-bearing types (§3.4)'
 
     expect(screen.getByText('Description')).toBeInTheDocument();
     expect(screen.getByText('Links')).toBeInTheDocument();
-    expect(screen.getByText('Tech icons')).toBeInTheDocument();
+    // Skill Refs v1.8: the bare-URL "Tech icons" stringList is replaced by the skillRefs picker.
+    expect(screen.getByText('Tech (from Skills)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add skill/i })).toBeInTheDocument();
     // The media field now opens the reusable MediaPicker (task #446): a "Choose…" button.
     expect(screen.getByRole('button', { name: /choose/i })).toBeInTheDocument();
   });
