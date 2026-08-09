@@ -125,13 +125,13 @@ export interface DuolingoData {
 }
 
 /**
- * github — live section (§3.5, v1.2): config only. Contribution-calendar weeks;
- * data fetched from `GET /api/github` at runtime.
+ * github — live section (§3.5, v1.10): config only. Heading + optional intro; the public
+ * site renders a fully browsable contribution calendar (year picker), so the obsolete v1.2
+ * `weeks` window is gone. Calendar data is fetched from `GET /api/github` at runtime.
  */
 export interface GithubData {
   heading?: string;
   intro?: string;
-  weeks?: number;
 }
 
 /**
