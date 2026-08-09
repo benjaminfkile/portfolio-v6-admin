@@ -263,15 +263,6 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     fields: [
       { key: 'heading', label: 'Heading', kind: 'text' },
       { key: 'intro', label: 'Intro', kind: 'multiline', helperText: 'Optional lead-in text shown under the heading' },
-      {
-        key: 'weeks',
-        label: 'Weeks of history',
-        kind: 'number',
-        min: 1,
-        max: 53,
-        integer: true,
-        helperText: '1–53; defaults to 52 (a full year)',
-      },
     ],
     defaultData: {},
   },

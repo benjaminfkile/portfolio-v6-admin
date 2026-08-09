@@ -27,3 +27,17 @@ describe('sectionRegistry — portfolio Skill Refs v1.8', () => {
     expect(getSectionTypeDef('portfolio')).toBe(portfolio);
   });
 });
+
+describe('sectionRegistry — github GitHub Explorer v1.10', () => {
+  const github = SECTION_TYPES.github;
+
+  it('github section fields are heading + intro only (obsolete `weeks` dropped)', () => {
+    expect(github.fields.map((f) => f.key)).toEqual(['heading', 'intro']);
+    // The v1.2 window control is gone entirely — the client renders the full calendar.
+    expect(github.fields.find((f) => f.key === 'weeks')).toBeUndefined();
+  });
+
+  it('default github data no longer seeds a weeks window', () => {
+    expect('weeks' in github.defaultData).toBe(false);
+  });
+});
