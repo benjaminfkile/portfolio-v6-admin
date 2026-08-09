@@ -280,6 +280,7 @@ export default function IconPicker({
                   >
                     <Box
                       component="img"
+                      crossOrigin="anonymous"
                       src={deviconPreviewUrl(version, icon.name, icon.versions[0])}
                       alt=""
                       sx={{ width: 32, height: 32, objectFit: 'contain' }}
@@ -337,10 +338,10 @@ export default function IconPicker({
                     >
                       <Stack direction="row" spacing={0.5}>
                         <Box sx={{ bgcolor: LIGHT_SWATCH, borderRadius: 0.5, p: 0.5, display: 'flex' }}>
-                          <Box component="img" src={src} alt="" sx={{ width: 28, height: 28 }} />
+                          <Box component="img" crossOrigin="anonymous" src={src} alt="" sx={{ width: 28, height: 28 }} />
                         </Box>
                         <Box sx={{ bgcolor: DARK_SWATCH, borderRadius: 0.5, p: 0.5, display: 'flex' }}>
-                          <Box component="img" src={src} alt="" sx={{ width: 28, height: 28 }} />
+                          <Box component="img" crossOrigin="anonymous" src={src} alt="" sx={{ width: 28, height: 28 }} />
                         </Box>
                       </Stack>
                       <Typography variant="caption">{v}</Typography>
@@ -432,6 +433,7 @@ export default function IconPicker({
                   >
                     <Box
                       component="img"
+                      crossOrigin="anonymous"
                       src={simpleIconPreviewUrl(icon.slug, colorValid ? color : 'EDF1F7')}
                       alt=""
                       sx={{ width: 32, height: 32, objectFit: 'contain' }}
@@ -502,6 +504,7 @@ export default function IconPicker({
                 >
                   <Box
                     component="img"
+                    crossOrigin="anonymous"
                     src={simpleIconPreviewUrl(siChosen.slug, colorValid ? color : 'EDF1F7')}
                     alt={`${siChosen.title} tinted preview`}
                     sx={{ width: 40, height: 40, objectFit: 'contain' }}

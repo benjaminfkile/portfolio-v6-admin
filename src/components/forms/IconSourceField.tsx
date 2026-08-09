@@ -49,10 +49,10 @@ export default function IconSourceField({
         {value && (
           <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
             <Box sx={{ bgcolor: LIGHT_SWATCH, borderRadius: 0.5, p: 0.5, display: 'flex' }}>
-              <Box component="img" src={value} alt="" sx={{ width: 24, height: 24, objectFit: 'contain' }} />
+              <Box component="img" crossOrigin="anonymous" src={value} alt="" sx={{ width: 24, height: 24, objectFit: 'contain' }} />
             </Box>
             <Box sx={{ bgcolor: DARK_SWATCH, borderRadius: 0.5, p: 0.5, display: 'flex' }}>
-              <Box component="img" src={value} alt="" sx={{ width: 24, height: 24, objectFit: 'contain' }} />
+              <Box component="img" crossOrigin="anonymous" src={value} alt="" sx={{ width: 24, height: 24, objectFit: 'contain' }} />
             </Box>
           </Stack>
         )}
