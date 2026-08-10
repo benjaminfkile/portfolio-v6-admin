@@ -1,14 +1,21 @@
 /**
- * Post metadata editor (§3.6): title, slug, excerpt, tags, and cover media. The slug is
- * **freely editable until first publish, then locked** (§3.6) — once locked the field is
- * disabled and carries an explanatory tooltip, because changing it breaks every inbound
- * link. Cover selection reuses {@link MediaIdField} → the shared MediaPicker. MUI + `sx`.
+ * Post metadata editor (§3.6, Blogs v1.13): title, slug, excerpt, blog, tags, and cover media.
+ * The slug is **freely editable until first publish, then locked** (§3.6) — once locked the
+ * field is disabled and carries an explanatory tooltip, because changing it breaks every
+ * inbound link. Cover selection reuses {@link MediaIdField} → the shared MediaPicker.
+ *
+ * The Blog select is populated from `GET /api/admin/blogs`; a "No blog" option maps to `null`
+ * so a post can be unassigned. It writes `blog_id` on save (Blogs v1.13). MUI + `sx`.
  */
-import { Box, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Box, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import TagsInput from './TagsInput';
 import MediaIdField from '../forms/MediaIdField';
+import type { Blog } from '../../types/admin';
+import { getBlogs } from '../../api/blogsApi';
+import { serverMessage } from '../../api/serverMessage';
 
 export interface PostMetadataValue {
   title: string;
@@ -16,6 +23,8 @@ export interface PostMetadataValue {
   excerpt: string;
   tags: string[];
   cover_media_id: string | null;
+  /** The blog this post is assigned to, or null = unassigned (Blogs v1.13). */
+  blog_id: string | null;
 }
 
 interface PostMetadataEditorProps {
@@ -29,6 +38,9 @@ const SLUG_LOCK_TOOLTIP =
   'The slug is locked because this post has been published. Changing it would break every ' +
   'inbound link, so it is fixed after first publish (§3.6).';
 
+/** Sentinel value for the "No blog" option — MUI selects cannot hold a real `null`. */
+const NO_BLOG = '';
+
 export default function PostMetadataEditor({
   value,
   onChange,
@@ -36,6 +48,28 @@ export default function PostMetadataEditor({
 }: PostMetadataEditorProps) {
   const set = <K extends keyof PostMetadataValue>(key: K, v: PostMetadataValue[K]) =>
     onChange({ ...value, [key]: v });
+
+  const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [blogsError, setBlogsError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    getBlogs()
+      .then((data) => {
+        if (alive) setBlogs(data);
+      })
+      .catch((err) => {
+        if (alive) setBlogsError(serverMessage(err, 'Could not load the blog list.'));
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // A post may reference a blog that isn't in the fetched list (e.g. list failed to load);
+  // surface it as its own option so the current assignment is never silently dropped.
+  const currentMissing =
+    value.blog_id != null && !blogs.some((b) => b.id === value.blog_id);
 
   return (
     <Stack spacing={2.5}>
@@ -77,6 +111,31 @@ export default function PostMetadataEditor({
           }}
         />
       </Tooltip>
+
+      <TextField
+        select
+        label="Blog"
+        fullWidth
+        size="small"
+        value={value.blog_id ?? NO_BLOG}
+        onChange={(e) => set('blog_id', e.target.value === NO_BLOG ? null : e.target.value)}
+        error={Boolean(blogsError)}
+        helperText={
+          blogsError ? blogsError : 'Which blog this post belongs to. Leave as "No blog" to leave it unassigned.'
+        }
+      >
+        <MenuItem value={NO_BLOG}>No blog</MenuItem>
+        {blogs.map((blog) => (
+          <MenuItem key={blog.id} value={blog.id}>
+            {blog.name}
+          </MenuItem>
+        ))}
+        {currentMissing && (
+          <MenuItem value={value.blog_id as string}>
+            {value.blog_id} (current)
+          </MenuItem>
+        )}
+      </TextField>
 
       <TextField
         label="Excerpt"

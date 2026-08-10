@@ -19,6 +19,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ArticleIcon from '@mui/icons-material/Article';
 import PermMediaIcon from '@mui/icons-material/PermMedia';
 import HistoryIcon from '@mui/icons-material/History';
@@ -42,6 +43,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Pages', path: '/pages', icon: <AutoStoriesIcon /> },
   { label: 'Sections', path: '/sections', icon: <ViewQuiltIcon /> },
+  { label: 'Blogs', path: '/blogs', icon: <MenuBookIcon /> },
   { label: 'Posts', path: '/posts', icon: <ArticleIcon /> },
   { label: 'Media', path: '/media', icon: <PermMediaIcon /> },
   { label: 'Versions', path: '/versions', icon: <HistoryIcon /> },

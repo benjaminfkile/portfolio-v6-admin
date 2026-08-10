@@ -73,6 +73,8 @@ export interface UpdatePostPayload {
   excerpt?: string;
   tags?: string[];
   cover_media_id?: string | null;
+  /** The blog this post is assigned to; null unassigns it (Blogs v1.13). */
+  blog_id?: string | null;
   draft_body?: Block[];
   expected_updated_at: string;
 }

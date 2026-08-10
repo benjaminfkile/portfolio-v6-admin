@@ -28,6 +28,23 @@ describe('sectionRegistry — portfolio Skill Refs v1.8', () => {
   });
 });
 
+describe('sectionRegistry — blog Blogs v1.13', () => {
+  const blog = SECTION_TYPES.blog;
+
+  it('blog section carries an optional blogSlug field for the blog slug', () => {
+    const field = blog.fields.find((f) => f.key === 'blog');
+    expect(field).toBeDefined();
+    expect(field?.kind).toBe('blogSlug');
+    expect(field?.required).toBeFalsy();
+    // Helper text warns that a stale slug blocks publish.
+    expect(field?.helperText).toMatch(/publish fails if the selected blog slug no longer exists/i);
+  });
+
+  it('keeps the existing limit and tag controls alongside the new blog field', () => {
+    expect(blog.fields.map((f) => f.key)).toEqual(['limit', 'blog', 'tag']);
+  });
+});
+
 describe('sectionRegistry — github GitHub Explorer v1.10', () => {
   const github = SECTION_TYPES.github;
 

@@ -18,6 +18,7 @@ export type FieldKind =
   | 'number'
   | 'boolean'
   | 'select'
+  | 'blogSlug'
   | 'media'
   | 'icon'
   | 'links'
@@ -207,6 +208,14 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     hasItems: false,
     fields: [
       { key: 'limit', label: 'Number of posts', kind: 'number', required: true, min: 1, integer: true },
+      {
+        key: 'blog',
+        label: 'Blog',
+        kind: 'blogSlug',
+        helperText:
+          'Optional — limit this section to one blog by its slug. Leave blank to show posts ' +
+          'from all blogs. Publish fails if the selected blog slug no longer exists.',
+      },
       { key: 'tag', label: 'Tag filter', kind: 'text' },
     ],
     defaultData: { limit: 3 },

@@ -12,6 +12,7 @@ import StringListField from './StringListField';
 import SkillRefsField from './SkillRefsField';
 import MediaIdField from './MediaIdField';
 import IconSourceField from './IconSourceField';
+import BlogSlugField from './BlogSlugField';
 
 interface FieldRendererProps {
   field: FieldDef;
@@ -91,6 +92,16 @@ export default function FieldRenderer({ field, value, data, onChange }: FieldRen
             </MenuItem>
           ))}
         </TextField>
+      );
+
+    case 'blogSlug':
+      return (
+        <BlogSlugField
+          label={field.label}
+          value={(value as string) ?? ''}
+          onChange={(v) => set(v)}
+          helperText={field.helperText}
+        />
       );
 
     case 'stringList':
