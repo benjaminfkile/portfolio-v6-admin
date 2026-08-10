@@ -260,6 +260,10 @@ export interface Post {
   excerpt: string;
   cover_media_id: string | null;
   tags: string[];
+  /** The blog this post is assigned to, or null = unassigned (Blogs v1.13). */
+  blog_id: string | null;
+  /** Denormalised blog summary for display; null when unassigned (Blogs v1.13). */
+  blog: { slug: string; name: string } | null;
   draft_body: Block[];
   /** null until first publish (§3.6). */
   published_body: Block[] | null;

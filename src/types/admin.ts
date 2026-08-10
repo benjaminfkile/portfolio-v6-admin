@@ -61,6 +61,24 @@ export interface Page {
 }
 
 /**
+ * One blog in the admin blog list (Blogs v1.13, `GET /api/admin/blogs`). Posts reference a
+ * blog by `blog_id` (nullable); a blog groups posts under a slug. `post_count` is how many
+ * posts are currently assigned. Deleting a blog never deletes its posts — it unassigns them
+ * (`blog_id -> null`).
+ *
+ * `updated_at` is load-bearing: every mutating write echoes it back as `expected_updated_at`
+ * for the optimistic-concurrency check (§4.5), matching how {@link Page} works.
+ */
+export interface Blog {
+  id: string;
+  slug: string;
+  name: string;
+  /** How many posts are currently assigned to this blog. */
+  post_count: number;
+  updated_at: string;
+}
+
+/**
  * One published snapshot in the version history (§4.2 `GET /api/admin/versions`). Each
  * `POST /api/admin/publish` (and each restore) appends one of these; `version` is the
  * monotonically increasing snapshot number, `published_by` the admin who cut it.

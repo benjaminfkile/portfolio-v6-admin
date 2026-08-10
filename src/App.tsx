@@ -5,6 +5,7 @@ import AppShell from './components/AppShell';
 import LoginPage from './pages/LoginPage';
 import PagesPage from './pages/PagesPage';
 import SectionsPage from './pages/SectionsPage';
+import BlogsPage from './pages/BlogsPage';
 import PostsPage from './pages/PostsPage';
 import PostEditorPage from './pages/PostEditorPage';
 import PostPreviewPage from './pages/PostPreviewPage';
@@ -25,6 +26,7 @@ export default function App() {
             <Route index element={<Navigate to="/sections" replace />} />
             <Route path="/pages" element={<PagesPage />} />
             <Route path="/sections" element={<SectionsPage />} />
+            <Route path="/blogs" element={<BlogsPage />} />
             <Route path="/posts" element={<PostsPage />} />
             <Route path="/posts/:id" element={<PostEditorPage />} />
             <Route path="/posts/:id/preview" element={<PostPreviewPage />} />

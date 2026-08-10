@@ -20,6 +20,8 @@ const post: Post = {
   excerpt: '',
   cover_media_id: null,
   tags: [],
+  blog_id: null,
+  blog: null,
   draft_body: [],
   published_body: null,
   published_at: null,

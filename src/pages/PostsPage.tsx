@@ -1,9 +1,10 @@
 /**
- * Posts list page (§3.6, §4.2). Lists every post — drafts included — with a draft/published
- * status chip and the `published_at` date, plus a create flow. Creating a post opens the
- * block editor for it; clicking a row opens it for editing.
+ * Posts list page (§3.6, §4.2, Blogs v1.13). Lists every post — drafts included — with a
+ * draft/published status chip, its blog (as a chip), and the `published_at` date, plus a
+ * create flow. A blog filter select narrows the list to one blog (or the unassigned posts).
+ * Creating a post opens the block editor for it; clicking a row opens it for editing.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -11,21 +12,31 @@ import {
   Button,
   Chip,
   CircularProgress,
+  MenuItem,
   Paper,
   Snackbar,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import type { Post } from '../types/content';
+import type { Blog } from '../types/admin';
 import { createPost, getPosts } from '../api/postsApi';
+import { getBlogs } from '../api/blogsApi';
 import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import CreatePostDialog from '../components/posts/CreatePostDialog';
 
+/** Blog-filter sentinels; real blog ids never collide with these. */
+const ALL_BLOGS = '__all__';
+const NO_BLOG = '__none__';
+
 export default function PostsPage() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [blogFilter, setBlogFilter] = useState<string>(ALL_BLOGS);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [creating, setCreating] = useState(false);
@@ -36,9 +47,14 @@ export default function PostsPage() {
     setLoading(true);
     setLoadError('');
     try {
-      const data = await getPosts();
+      const [postData, blogData] = await Promise.all([
+        getPosts(),
+        // The filter is a convenience; a failed blog list must not break the posts list.
+        getBlogs().catch(() => [] as Blog[]),
+      ]);
       // Most recently updated first; a stable, predictable ordering for the list.
-      setPosts([...data].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+      setPosts([...postData].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+      setBlogs(blogData);
     } catch (err) {
       setLoadError(serverMessage(err, 'Could not load posts. Is the API reachable?'));
     } finally {
@@ -63,6 +79,12 @@ export default function PostsPage() {
     }
   };
 
+  const filteredPosts = useMemo(() => {
+    if (blogFilter === ALL_BLOGS) return posts;
+    if (blogFilter === NO_BLOG) return posts.filter((p) => p.blog_id == null);
+    return posts.filter((p) => p.blog_id === blogFilter);
+  }, [posts, blogFilter]);
+
   return (
     <Box>
       <Stack direction="row" sx={{ mb: 3, alignItems: 'center', justifyContent: 'space-between' }}>
@@ -73,6 +95,25 @@ export default function PostsPage() {
           New post
         </Button>
       </Stack>
+
+      {!loading && !loadError && posts.length > 0 && (
+        <TextField
+          select
+          label="Filter by blog"
+          size="small"
+          value={blogFilter}
+          onChange={(e) => setBlogFilter(e.target.value)}
+          sx={{ mb: 2, minWidth: 220 }}
+        >
+          <MenuItem value={ALL_BLOGS}>All blogs</MenuItem>
+          <MenuItem value={NO_BLOG}>No blog</MenuItem>
+          {blogs.map((blog) => (
+            <MenuItem key={blog.id} value={blog.id}>
+              {blog.name}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
 
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
@@ -97,9 +138,13 @@ export default function PostsPage() {
         <Alert severity="info">No posts yet. Create one to start writing.</Alert>
       )}
 
-      {!loading && !loadError && posts.length > 0 && (
+      {!loading && !loadError && posts.length > 0 && filteredPosts.length === 0 && (
+        <Alert severity="info">No posts match this blog filter.</Alert>
+      )}
+
+      {!loading && !loadError && filteredPosts.length > 0 && (
         <Stack spacing={1.5}>
-          {posts.map((post) => {
+          {filteredPosts.map((post) => {
             const published = post.published_at !== null;
             return (
               <Paper
@@ -123,6 +168,15 @@ export default function PostsPage() {
                       /{post.slug}
                     </Typography>
                   </Box>
+                  {post.blog && (
+                    <Chip
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      label={post.blog.name}
+                      data-testid="post-blog-chip"
+                    />
+                  )}
                   {post.tags.length > 0 && (
                     <Stack direction="row" spacing={0.5} sx={{ display: { xs: 'none', sm: 'flex' } }}>
                       {post.tags.slice(0, 3).map((tag) => (
