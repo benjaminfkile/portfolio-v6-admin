@@ -79,6 +79,41 @@ export interface Blog {
 }
 
 /**
+ * One admin API key (API Keys v1.16, `GET /api/admin/api-keys`). A key grants programmatic
+ * access to a narrow slice of the API — posts, media upload, and the blogs list — never
+ * page/section editing or a site publish.
+ *
+ * The full secret (`pv6k_<random>`) is returned ONLY once, at mint time (see
+ * {@link MintedApiKey}); the list endpoint never echoes it. `key_prefix` is the first 12
+ * chars of the secret, kept for display so an admin can tell which key a row is.
+ *
+ * A key is either active or revoked: `revoked_at` is null while the key works and carries the
+ * revocation timestamp once it has been revoked. `last_used_at` is null until the key first
+ * authenticates a request.
+ */
+export interface ApiKey {
+  id: string;
+  name: string;
+  /** First 12 chars of the secret, e.g. `pv6k_abc1234`. Safe to display; not the full key. */
+  key_prefix: string;
+  created_at: string;
+  /** null until the key first authenticates a request. */
+  last_used_at: string | null;
+  /** null while active; the revocation timestamp once revoked. */
+  revoked_at: string | null;
+}
+
+/**
+ * The response of `POST /api/admin/api-keys` — a freshly minted key. Extends {@link ApiKey}
+ * with `key`, the FULL secret, which the API returns ONLY in this one response. The mint UI
+ * shows it once behind an explicit acknowledge and never has a way to fetch it again.
+ */
+export interface MintedApiKey extends ApiKey {
+  /** The full `pv6k_<random>` secret — shown once at mint, never retrievable afterwards. */
+  key: string;
+}
+
+/**
  * One published snapshot in the version history (§4.2 `GET /api/admin/versions`). Each
  * `POST /api/admin/publish` (and each restore) appends one of these; `version` is the
  * monotonically increasing snapshot number, `published_by` the admin who cut it.
