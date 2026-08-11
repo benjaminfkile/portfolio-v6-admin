@@ -10,6 +10,7 @@ import type { Link } from '../../types/content';
 import LinkEditor from './LinkEditor';
 import StringListField from './StringListField';
 import SkillRefsField from './SkillRefsField';
+import PostRefsField from './PostRefsField';
 import MediaIdField from './MediaIdField';
 import IconSourceField from './IconSourceField';
 import BlogSlugField from './BlogSlugField';
@@ -121,6 +122,16 @@ export default function FieldRenderer({ field, value, data, onChange }: FieldRen
     case 'skillRefs':
       return (
         <SkillRefsField
+          label={field.label}
+          value={(value as string[]) ?? []}
+          onChange={(next) => set(next)}
+          helperText={field.helperText}
+        />
+      );
+
+    case 'postRefs':
+      return (
+        <PostRefsField
           label={field.label}
           value={(value as string[]) ?? []}
           onChange={(next) => set(next)}
