@@ -45,6 +45,7 @@ import type { Integration } from '../api/integrationsApi';
 import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ApiKeysSection from '../components/apiKeys/ApiKeysSection';
 
 /** Below this many days remaining, the expiry line escalates to a warning. */
 export const EXPIRY_WARNING_DAYS = 30;
@@ -392,6 +393,8 @@ export default function IntegrationsPage() {
           )}
         </Stack>
       )}
+
+      <ApiKeysSection />
 
       <Snackbar
         open={Boolean(toast)}

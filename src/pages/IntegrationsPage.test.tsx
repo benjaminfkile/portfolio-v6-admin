@@ -13,6 +13,13 @@ vi.mock('../api/integrationsApi', () => ({
   saveIntegrationValue: vi.fn(),
 }));
 
+// The API-keys section fetches on mount; mock its API so the page test stays hermetic.
+vi.mock('../api/apiKeysApi', () => ({
+  getApiKeys: vi.fn().mockResolvedValue([]),
+  createApiKey: vi.fn(),
+  revokeApiKey: vi.fn(),
+}));
+
 const spotify: Integration = {
   key: 'spotify',
   name: 'Spotify',
@@ -78,6 +85,14 @@ describe('IntegrationsPage — list of cards (§4.7)', () => {
     expect(await screen.findByRole('heading', { name: 'Spotify' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'GitHub' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Duolingo' })).toBeInTheDocument();
+  });
+
+  it('hosts the API keys section with its scope description', async () => {
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'API keys' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/programmatic access to posts, media upload, and the blogs list/i),
+    ).toBeInTheDocument();
   });
 });
 
