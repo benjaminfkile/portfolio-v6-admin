@@ -23,6 +23,7 @@ export type FieldKind =
   | 'icon'
   | 'links'
   | 'skillRefs'
+  | 'postRefs'
   | 'stringList';
 
 export interface FieldDef {
@@ -180,6 +181,14 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
         helperText:
           'References skills from the Skills section — icons and names always match the sphere.',
       },
+      {
+        key: 'post_refs',
+        label: 'Related posts',
+        kind: 'postRefs',
+        helperText:
+          'References blog posts by id (max 12). Drafts are allowed but stay hidden on the ' +
+          'public site until published; a ref to a deleted post blocks publish.',
+      },
       { key: 'links', label: 'Links', kind: 'links', helperText: LINK_HELPER },
     ],
     defaultData: {},
@@ -189,6 +198,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       description: '',
       media_id: '',
       skill_refs: [],
+      post_refs: [],
       links: [],
     },
   },
