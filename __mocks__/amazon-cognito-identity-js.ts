@@ -31,12 +31,18 @@ const state: {
   session: FakeSession;
   currentUser: FakeCurrentUser | null;
   challenge: 'newPasswordRequired' | 'totpRequired' | 'mfaSetup' | null;
+  challengeUserAttributes: Record<string, string>;
+  challengeRequiredAttributes: string[];
+  lastNewPasswordAttrs: Record<string, string> | null;
   totpSecret: string;
 } = {
   authError: null,
   session: makeSession('default-id-token'),
   currentUser: null,
   challenge: null,
+  challengeUserAttributes: { email: 'x@y.z' },
+  challengeRequiredAttributes: [],
+  lastNewPasswordAttrs: null,
   totpSecret: 'MOCKSECRET234567',
 };
 
@@ -46,6 +52,9 @@ export function __reset(): void {
   state.session = makeSession('default-id-token');
   state.currentUser = null;
   state.challenge = null;
+  state.challengeUserAttributes = { email: 'x@y.z' };
+  state.challengeRequiredAttributes = [];
+  state.lastNewPasswordAttrs = null;
   state.totpSecret = 'MOCKSECRET234567';
 }
 
@@ -59,6 +68,24 @@ export function __setChallenge(
   challenge: 'newPasswordRequired' | 'totpRequired' | 'mfaSetup',
 ): void {
   state.challenge = challenge;
+}
+
+/**
+ * Stage the (userAttributes, requiredAttributes) a NEW_PASSWORD_REQUIRED
+ * challenge hands its callback — mirrors the SDK, which passes the profile
+ * snapshot plus the prefix-stripped names of pool-required attributes.
+ */
+export function __setNewPasswordChallengeAttributes(
+  userAttributes: Record<string, string>,
+  requiredAttributes: string[],
+): void {
+  state.challengeUserAttributes = userAttributes;
+  state.challengeRequiredAttributes = requiredAttributes;
+}
+
+/** The attribute map the last completeNewPasswordChallenge call sent, or null. */
+export function __getLastNewPasswordAttrs(): Record<string, string> | null {
+  return state.lastNewPasswordAttrs;
 }
 
 /** Stage the session `authenticateUser().onSuccess` resolves with. */
@@ -110,7 +137,10 @@ export const CognitoUser = vi.fn().mockImplementation(() => ({
   authenticateUser: vi.fn((_details: unknown, callbacks: AuthCallbacks) => {
     if (state.challenge === 'newPasswordRequired' && callbacks.newPasswordRequired) {
       state.challenge = null;
-      return callbacks.newPasswordRequired({ email: 'x@y.z' }, []);
+      return callbacks.newPasswordRequired(
+        state.challengeUserAttributes,
+        state.challengeRequiredAttributes,
+      );
     }
     if (state.challenge === 'totpRequired' && callbacks.totpRequired) {
       state.challenge = null;
@@ -123,7 +153,8 @@ export const CognitoUser = vi.fn().mockImplementation(() => ({
     settleStep(callbacks);
   }),
   completeNewPasswordChallenge: vi.fn(
-    (_newPassword: string, _attrs: unknown, callbacks: AuthCallbacks) => {
+    (_newPassword: string, attrs: Record<string, string>, callbacks: AuthCallbacks) => {
+      state.lastNewPasswordAttrs = attrs;
       // A staged second challenge lets tests chain new-password -> TOTP setup.
       if (state.challenge === 'mfaSetup' && callbacks.mfaSetup) {
         state.challenge = null;

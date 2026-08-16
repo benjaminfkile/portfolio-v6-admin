@@ -11,6 +11,13 @@ interface LocationState {
 // A challenge step mid-login; null = showing the credentials form.
 type Challenge = Exclude<SignInResult, { kind: 'success' }> | null;
 
+// Friendly labels for pool-required attributes the new-password challenge may
+// ask for (§5.1); anything unmapped falls back to the raw attribute name.
+const ATTRIBUTE_LABELS: Record<string, string> = {
+  given_name: 'First name',
+  family_name: 'Last name',
+};
+
 // MUI login page (spec §5.2). SRP sign-in via AuthContext. Admin-created users
 // (§5.1) answer a new-password challenge on first login, and the prod pool adds
 // TOTP setup/entry; each challenge renders as its own step. On success, return
@@ -24,6 +31,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [challengeAttrs, setChallengeAttrs] = useState<Record<string, string>>({});
   const [totpCode, setTotpCode] = useState('');
   const [challenge, setChallenge] = useState<Challenge>(null);
   const [error, setError] = useState('');
@@ -37,6 +45,7 @@ export default function LoginPage() {
       return;
     }
     setTotpCode('');
+    setChallengeAttrs({});
     setChallenge(result);
   }
 
@@ -64,7 +73,11 @@ export default function LoginPage() {
       setError('Passwords do not match.');
       return;
     }
-    void submitStep(() => challenge.complete(newPassword));
+    if (challenge.missingAttributes.some((name) => !challengeAttrs[name]?.trim())) {
+      setError('All fields are required.');
+      return;
+    }
+    void submitStep(() => challenge.complete(newPassword, challengeAttrs));
   }
 
   function handleTotp(e: FormEvent) {
@@ -151,6 +164,18 @@ export default function LoginPage() {
 
           {challenge?.kind === 'newPasswordRequired' && (
             <Box component="form" onSubmit={handleNewPassword} noValidate>
+              {challenge.missingAttributes.map((name) => (
+                <TextField
+                  key={name}
+                  label={ATTRIBUTE_LABELS[name] ?? name}
+                  value={challengeAttrs[name] ?? ''}
+                  onChange={(e) =>
+                    setChallengeAttrs((attrs) => ({ ...attrs, [name]: e.target.value }))
+                  }
+                  fullWidth
+                  margin="normal"
+                />
+              ))}
               <TextField
                 label="New password"
                 type="password"

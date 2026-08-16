@@ -14,6 +14,11 @@ const sdk = cognitoSdk as unknown as {
   __setSignedIn: (idToken?: string, valid?: boolean) => void;
   __setSessionError: (error: Error) => void;
   __setChallenge: (c: 'newPasswordRequired' | 'totpRequired' | 'mfaSetup') => void;
+  __setNewPasswordChallengeAttributes: (
+    userAttributes: Record<string, string>,
+    requiredAttributes: string[],
+  ) => void;
+  __getLastNewPasswordAttrs: () => Record<string, string> | null;
 };
 
 beforeEach(() => {
@@ -41,6 +46,47 @@ describe('cognitoClient', () => {
       kind: 'success',
       idToken: 'post-challenge-token',
     });
+  });
+
+  it('surfaces pool-required attributes the invite left unset and sends the collected values', async () => {
+    // An invited user with no given_name/family_name: Cognito lists both as
+    // required, and completing without them fails with "Invalid attributes
+    // given, given_name is missing".
+    sdk.__setChallenge('newPasswordRequired');
+    sdk.__setNewPasswordChallengeAttributes({ email: 'x@y.z', email_verified: 'true' }, [
+      'given_name',
+      'family_name',
+    ]);
+    sdk.__setSession('post-challenge-token');
+
+    const first = await signIn('admin@benkile.com', 'temp-password');
+    if (first.kind !== 'newPasswordRequired') throw new Error('unreachable');
+    expect(first.missingAttributes).toEqual(['given_name', 'family_name']);
+
+    await expect(
+      first.complete('New-Password-123!', { given_name: 'Ben', family_name: 'Kile' }),
+    ).resolves.toEqual({ kind: 'success', idToken: 'post-challenge-token' });
+    // Exactly the required set — never email_verified, which Cognito rejects.
+    expect(sdk.__getLastNewPasswordAttrs()).toEqual({ given_name: 'Ben', family_name: 'Kile' });
+  });
+
+  it('echoes required attributes already on the profile without needing form input', async () => {
+    sdk.__setChallenge('newPasswordRequired');
+    sdk.__setNewPasswordChallengeAttributes(
+      { email: 'x@y.z', email_verified: 'true', given_name: 'Ben', family_name: 'Kile' },
+      ['given_name', 'family_name'],
+    );
+    sdk.__setSession('post-challenge-token');
+
+    const first = await signIn('admin@benkile.com', 'temp-password');
+    if (first.kind !== 'newPasswordRequired') throw new Error('unreachable');
+    expect(first.missingAttributes).toEqual([]);
+
+    await expect(first.complete('New-Password-123!')).resolves.toEqual({
+      kind: 'success',
+      idToken: 'post-challenge-token',
+    });
+    expect(sdk.__getLastNewPasswordAttrs()).toEqual({ given_name: 'Ben', family_name: 'Kile' });
   });
 
   it('rejects a weak new password with the Cognito error, not a crash', async () => {

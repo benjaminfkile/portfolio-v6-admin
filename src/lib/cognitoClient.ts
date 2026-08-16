@@ -38,7 +38,16 @@ export type SignInResult =
   | {
       /** First login with an admin-issued temporary password (§5.1). */
       kind: 'newPasswordRequired';
-      complete: (newPassword: string) => Promise<SignInResult>;
+      /**
+       * Pool-required attributes the challenge demands a value for and the
+       * user's profile doesn't have (e.g. given_name on an invite that didn't
+       * set it). The UI must collect these and pass them to `complete`.
+       */
+      missingAttributes: string[];
+      complete: (
+        newPassword: string,
+        attributes?: Record<string, string>,
+      ) => Promise<SignInResult>;
     }
   | {
       /** Pool requires TOTP and this user has not enrolled yet (prod, §5.1). */
@@ -77,15 +86,27 @@ export function signIn(email: string, password: string): Promise<SignInResult> {
       settle.resolve({ kind: 'success', idToken: session.getIdToken().getJwtToken() }),
     onFailure: (err: unknown) => settle.reject(err),
 
-    newPasswordRequired: () => {
+    newPasswordRequired: (
+      userAttributes: Record<string, string> | null,
+      requiredAttributes: string[],
+    ) => {
       settle.resolve({
         kind: 'newPasswordRequired',
-        complete: (newPassword: string) => {
+        missingAttributes: requiredAttributes.filter((name) => !userAttributes?.[name]),
+        complete: (newPassword: string, attributes: Record<string, string> = {}) => {
           const step = nextStep();
-          // All required attributes (email, given_name, family_name) were set
-          // at admin-create time (§5.1); echoing them back — especially
-          // email_verified — makes Cognito reject the call, so pass none.
-          user.completeNewPasswordChallenge(newPassword, {}, callbacks);
+          // Cognito demands a value for exactly the names in requiredAttributes:
+          // omitting one fails with "Invalid attributes given, X is missing",
+          // while sending anything extra (especially email_verified, which the
+          // challenge's userAttributes includes) also makes it reject the call.
+          // Send precisely that set — form input first, existing profile value
+          // as the fallback.
+          const required: Record<string, string> = {};
+          for (const name of requiredAttributes) {
+            const value = attributes[name] ?? userAttributes?.[name];
+            if (value) required[name] = value;
+          }
+          user.completeNewPasswordChallenge(newPassword, required, callbacks);
           return step;
         },
       });
