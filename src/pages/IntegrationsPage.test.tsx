@@ -87,11 +87,14 @@ describe('IntegrationsPage — list of cards (§4.7)', () => {
     expect(screen.getByRole('heading', { name: 'Duolingo' })).toBeInTheDocument();
   });
 
-  it('hosts the API keys section with its scope description', async () => {
+  it('hosts the API keys section with its widened scope description', async () => {
     renderPage();
     expect(await screen.findByRole('heading', { name: 'API keys' })).toBeInTheDocument();
     expect(
-      screen.getByText(/programmatic access to posts, media upload, and the blogs list/i),
+      screen.getByText(/full content-editing surface/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/key management and integration credentials stay admin-only/i),
     ).toBeInTheDocument();
   });
 });

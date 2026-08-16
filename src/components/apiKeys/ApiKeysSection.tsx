@@ -1,10 +1,12 @@
 /**
- * API keys section (API Keys v1.16) — a self-contained block dropped onto the Integrations
- * page. Mints, lists, and revokes the programmatic-access keys.
+ * API keys section (API Keys v1.16) — a self-contained block reused by the Integrations and
+ * Agents pages. Mints, lists, and revokes the programmatic-access keys.
  *
- * Scope is spelled out for the admin: a key grants access to posts, media upload, and the blogs
- * list — never page/section editing or a site publish. Minting reveals the full secret exactly
- * once (see {@link MintKeyDialog}); the list only ever shows the 12-char prefix.
+ * Scope is spelled out for the admin: a key grants access to the full content-editing surface
+ * (pages, sections, items, blogs, posts, media, publish, versions, preview, analytics). Key
+ * management and integration credentials stay admin-only — a key gets 401 on those routes.
+ * Minting reveals the full secret exactly once (see {@link MintKeyDialog}); the list only ever
+ * shows the 12-char prefix.
  *
  * Revoked keys render dimmed with a "revoked" chip and no actions. Revoking an active key is
  * gated behind a ConfirmDialog that warns applications using it stop working immediately, then
@@ -119,8 +121,9 @@ export default function ApiKeysSection() {
             API keys
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
-            Keys grant programmatic access to posts, media upload, and the blogs list. They
-            cannot edit pages or sections, and cannot publish the site.
+            Keys grant programmatic access to the full content-editing surface — pages,
+            sections, items, blogs, posts, media, publish, versions, preview, and analytics.
+            Key management and integration credentials stay admin-only.
           </Typography>
         </Box>
         <Button
