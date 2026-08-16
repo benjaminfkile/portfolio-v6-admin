@@ -4,7 +4,8 @@ Cognito-gated admin UI for **Portfolio v6** — **Vite + React + TypeScript + MU
 themed (light/dark + system detection). It is the single-operator console for editing the
 public site's content: pages management, the section/item page builder, blogs, the blog
 post + block editor, the media library, preview, publishing, version history/restore,
-integrations (Spotify/GitHub/Duolingo + API keys), and analytics.
+integrations (Spotify/GitHub/Duolingo + API keys), analytics, and the Agents page for
+mint→hand-off→revoke API-key sessions with AI editing agents.
 
 Deploys to Vercel as `portfolio-v6-admin-dev` (production branch `dev`) and
 `portfolio-v6-admin-prod` (production branch `main`, portfolio-v6-admin-prod.vercel.app).
@@ -18,9 +19,11 @@ The system is a deliberate three-repo split: a public site (`portfolio-v6`), an 
 so all authenticated editing lives here. The admin talks only to the API's `/api/admin/*`
 routes (§4.2); auth is Cognito SRP with the id token attached as a bearer on each request
 and a one-shot refresh-then-logout on `401`. Server-side, admin routes require the token's
-`cognito:groups` to include `admins` (403 otherwise); a subset of routes (posts, media
-upload, blogs list) alternatively accepts a machine **API key** (`pv6k_…`) minted and
-revoked from the Integrations page — see `requireAdminOrMachine` in the API repo.
+`cognito:groups` to include `admins` (403 otherwise); the full content-editing surface
+(pages, sections, items, blogs, posts, media, publish, versions, preview, analytics)
+alternatively accepts a machine **API key** (`pv6k_…`) minted and revoked from the
+Integrations or Agents page — see `requireAdminOrMachine` in the API repo. Key management
+and integration credentials stay admin-only; a key gets 401 there by design.
 
 **Login flow** (`src/lib/cognitoClient.ts` + `src/pages/LoginPage.tsx`): SRP sign-in is a
 small state machine. First login with an admin-issued temporary password answers a
@@ -147,9 +150,9 @@ Every admin endpoint in spec §4.2 is reachable from the UI. The API wrappers li
 | `POST` | `/api/admin/blogs` | Blogs → **Add blog** dialog | `createBlog` |
 | `PATCH` | `/api/admin/blogs/:id` | Blog **Edit** dialog | `updateBlog` |
 | `DELETE` | `/api/admin/blogs/:id` | Blog row → **Delete** (confirm) | `deleteBlog` |
-| `GET` | `/api/admin/api-keys` | Integrations → API keys section | `getApiKeys` |
-| `POST` | `/api/admin/api-keys` | Integrations → **Create key** (secret shown once) | `createApiKey` |
-| `POST` | `/api/admin/api-keys/:id/revoke` | Integrations → key row **Revoke** (confirm) | `revokeApiKey` |
+| `GET` | `/api/admin/api-keys` | Integrations / Agents → API keys section | `getApiKeys` |
+| `POST` | `/api/admin/api-keys` | Integrations / Agents → **Create key** (secret shown once) | `createApiKey` |
+| `POST` | `/api/admin/api-keys/:id/revoke` | Integrations / Agents → key row **Revoke** (confirm) | `revokeApiKey` |
 | `GET` | `/api/admin/integrations` | Integrations page — list load | `getIntegrations` |
 | `PUT` | `/api/admin/integrations/:key/value` | Integrations → set PAT/username | `saveIntegrationValue` |
 | `POST` | `/api/admin/integrations/:key/connect` | Integrations → **Connect** (Spotify OAuth) | `connectIntegration` |
@@ -207,7 +210,8 @@ src/
 ├── components/                 AppShell, dialogs, dnd, forms, media, posts, sections,
 │                               preview, apiKeys
 ├── pages/                      Login, Pages, Sections, Blogs, Posts + editor/preview,
-│                               Media, Versions, Preview, Integrations, Analytics
+│                               Media, Versions, Preview, Integrations, Analytics, Agents
+├── content/agentPrompt.ts      Template for the copyable agent prompt on the Agents page
 └── types/content.ts            content model, sync'd from the API schema (§8.4)
 ```
 

@@ -71,9 +71,11 @@ describe('ApiKeysSection — scope description', () => {
     render(<ApiKeysSection />);
     expect(await screen.findByRole('heading', { name: 'API keys' })).toBeInTheDocument();
     expect(
-      screen.getByText(/programmatic access to posts, media upload, and the blogs list/i),
+      screen.getByText(/full content-editing surface/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/cannot publish the site/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/key management and integration credentials stay admin-only/i),
+    ).toBeInTheDocument();
   });
 });
 
