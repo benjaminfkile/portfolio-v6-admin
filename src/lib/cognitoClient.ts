@@ -153,6 +153,38 @@ export function signIn(email: string, password: string): Promise<SignInResult> {
   return first;
 }
 
+/**
+ * Start self-service password recovery: Cognito emails a verification code to
+ * the user's verified address. Resolves once the code is sent. Invited users
+ * who never completed their first login can't use this (Cognito rejects the
+ * call) — they need a fresh invite instead.
+ */
+export function requestPasswordReset(email: string): Promise<void> {
+  const user = new CognitoUser({ Username: email, Pool: getUserPool() });
+  return new Promise((resolve, reject) => {
+    user.forgotPassword({
+      inputVerificationCode: () => resolve(),
+      onSuccess: () => resolve(),
+      onFailure: (err: unknown) => reject(err),
+    });
+  });
+}
+
+/** Complete recovery with the emailed code and the chosen new password. */
+export function confirmPasswordReset(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<void> {
+  const user = new CognitoUser({ Username: email, Pool: getUserPool() });
+  return new Promise((resolve, reject) => {
+    user.confirmPassword(code.trim(), newPassword, {
+      onSuccess: () => resolve(),
+      onFailure: (err: unknown) => reject(err),
+    });
+  });
+}
+
 /** Sign out the current user locally (clears the session from localStorage). */
 export function signOut(): void {
   const user = getUserPool().getCurrentUser();

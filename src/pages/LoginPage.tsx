@@ -3,7 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Alert, Box, Button, Card, CardContent, TextField, Typography } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
-import type { SignInResult } from '../lib/cognitoClient';
+import {
+  requestPasswordReset,
+  confirmPasswordReset,
+  type SignInResult,
+} from '../lib/cognitoClient';
 
 interface LocationState {
   from?: { pathname: string };
@@ -35,6 +39,11 @@ export default function LoginPage() {
   const [challengeAttrs, setChallengeAttrs] = useState<Record<string, string>>({});
   const [totpCode, setTotpCode] = useState('');
   const [challenge, setChallenge] = useState<Challenge>(null);
+  // Self-service password recovery (§5.1): request emails a code, confirm
+  // exchanges code + new password. Mutually exclusive with a login challenge.
+  const [resetStep, setResetStep] = useState<'request' | 'confirm' | null>(null);
+  const [resetCode, setResetCode] = useState('');
+  const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -87,23 +96,85 @@ export default function LoginPage() {
     void submitStep(() => challenge.complete(totpCode));
   }
 
+  async function submitReset(action: () => Promise<void>, onDone: () => void) {
+    setError('');
+    setSubmitting(true);
+    try {
+      await action();
+      onDone();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Password reset failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleResetRequest(e: FormEvent) {
+    e.preventDefault();
+    void submitReset(
+      () => requestPasswordReset(email),
+      () => {
+        setNotice(`Verification code sent to ${email}.`);
+        setResetStep('confirm');
+      },
+    );
+  }
+
+  function handleResetConfirm(e: FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    void submitReset(
+      () => confirmPasswordReset(email, resetCode, newPassword),
+      () => {
+        setNotice('Password updated — sign in with your new password.');
+        setResetStep(null);
+        setResetCode('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setPassword('');
+      },
+    );
+  }
+
+  function startReset() {
+    setError('');
+    setNotice('');
+    setResetStep('request');
+  }
+
+  function backToSignIn() {
+    setError('');
+    setNotice('');
+    setResetStep(null);
+    setResetCode('');
+  }
+
   const heading =
-    challenge?.kind === 'newPasswordRequired'
-      ? 'Set a new password'
-      : challenge?.kind === 'totpSetupRequired'
-        ? 'Set up authenticator'
-        : challenge?.kind === 'totpRequired'
-          ? 'Enter authenticator code'
-          : 'Portfolio v6 Admin';
+    resetStep !== null
+      ? 'Reset password'
+      : challenge?.kind === 'newPasswordRequired'
+        ? 'Set a new password'
+        : challenge?.kind === 'totpSetupRequired'
+          ? 'Set up authenticator'
+          : challenge?.kind === 'totpRequired'
+            ? 'Enter authenticator code'
+            : 'Portfolio v6 Admin';
 
   const subheading =
-    challenge?.kind === 'newPasswordRequired'
-      ? 'Your temporary password must be replaced before continuing. Minimum 12 characters with upper, lower, number, and symbol (spec §5.1).'
-      : challenge?.kind === 'totpSetupRequired'
-        ? 'Scan the QR code with an authenticator app (Google Authenticator, 1Password, …), then enter the 6-digit code it shows.'
-        : challenge?.kind === 'totpRequired'
-          ? 'Enter the current 6-digit code from your authenticator app.'
-          : 'Sign in to manage site content.';
+    resetStep === 'request'
+      ? "Enter your email and we'll send a verification code."
+      : resetStep === 'confirm'
+        ? 'Enter the code from your email and choose a new password. Minimum 12 characters with upper, lower, number, and symbol (spec §5.1).'
+        : challenge?.kind === 'newPasswordRequired'
+          ? 'Your temporary password must be replaced before continuing. Minimum 12 characters with upper, lower, number, and symbol (spec §5.1).'
+          : challenge?.kind === 'totpSetupRequired'
+            ? 'Scan the QR code with an authenticator app (Google Authenticator, 1Password, …), then enter the 6-digit code it shows.'
+            : challenge?.kind === 'totpRequired'
+              ? 'Enter the current 6-digit code from your authenticator app.'
+              : 'Sign in to manage site content.';
 
   return (
     <Box
@@ -130,8 +201,13 @@ export default function LoginPage() {
               {error}
             </Alert>
           )}
+          {notice && !error && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {notice}
+            </Alert>
+          )}
 
-          {challenge === null && (
+          {challenge === null && resetStep === null && (
             <Box component="form" onSubmit={handleCredentials} noValidate>
               <TextField
                 label="Email"
@@ -159,6 +235,79 @@ export default function LoginPage() {
                 sx={{ mt: 3 }}
               >
                 {submitting ? 'Signing in…' : 'Sign In'}
+              </Button>
+              <Button onClick={startReset} size="small" fullWidth sx={{ mt: 1 }}>
+                Forgot password?
+              </Button>
+            </Box>
+          )}
+
+          {resetStep === 'request' && (
+            <Box component="form" onSubmit={handleResetRequest} noValidate>
+              <TextField
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                fullWidth
+                margin="normal"
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                fullWidth
+                disabled={submitting}
+                sx={{ mt: 3 }}
+              >
+                {submitting ? 'Sending…' : 'Send Code'}
+              </Button>
+              <Button onClick={backToSignIn} size="small" fullWidth sx={{ mt: 1 }}>
+                Back to sign in
+              </Button>
+            </Box>
+          )}
+
+          {resetStep === 'confirm' && (
+            <Box component="form" onSubmit={handleResetConfirm} noValidate>
+              <TextField
+                label="Verification code"
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value)}
+                autoComplete="one-time-code"
+                slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="New password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                fullWidth
+                margin="normal"
+              />
+              <TextField
+                label="Confirm new password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                fullWidth
+                margin="normal"
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                fullWidth
+                disabled={submitting}
+                sx={{ mt: 3 }}
+              >
+                {submitting ? 'Resetting…' : 'Reset Password'}
+              </Button>
+              <Button onClick={backToSignIn} size="small" fullWidth sx={{ mt: 1 }}>
+                Back to sign in
               </Button>
             </Box>
           )}

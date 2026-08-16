@@ -4,7 +4,13 @@ import * as cognitoSdk from 'amazon-cognito-identity-js';
 // Drive the real cognitoClient wrapper through the manual SDK mock (login flow, §5.2).
 vi.mock('amazon-cognito-identity-js');
 
-import { signIn, getIdToken, signOut } from './cognitoClient';
+import {
+  signIn,
+  getIdToken,
+  signOut,
+  requestPasswordReset,
+  confirmPasswordReset,
+} from './cognitoClient';
 
 // Mock-only helpers — see __mocks__/amazon-cognito-identity-js.ts.
 const sdk = cognitoSdk as unknown as {
@@ -155,5 +161,29 @@ describe('cognitoClient', () => {
 
   it('signOut is a no-op when no user is signed in', () => {
     expect(() => signOut()).not.toThrow();
+  });
+
+  it('requestPasswordReset resolves once the verification code is sent', async () => {
+    await expect(requestPasswordReset('admin@benkile.com')).resolves.toBeUndefined();
+  });
+
+  it('requestPasswordReset surfaces the Cognito error (e.g. unfinished invite)', async () => {
+    sdk.__setAuthError(new Error('User password cannot be reset in the current state.'));
+    await expect(requestPasswordReset('admin@benkile.com')).rejects.toThrow(
+      'User password cannot be reset in the current state.',
+    );
+  });
+
+  it('confirmPasswordReset resolves on a valid code and new password', async () => {
+    await expect(
+      confirmPasswordReset('admin@benkile.com', '123456', 'New-Password-123!'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('confirmPasswordReset surfaces the Cognito error on a bad code', async () => {
+    sdk.__setAuthError(new Error('Invalid verification code provided, please try again.'));
+    await expect(
+      confirmPasswordReset('admin@benkile.com', '000000', 'New-Password-123!'),
+    ).rejects.toThrow('Invalid verification code provided, please try again.');
   });
 });

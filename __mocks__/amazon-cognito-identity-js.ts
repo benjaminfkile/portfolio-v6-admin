@@ -179,8 +179,28 @@ export const CognitoUser = vi.fn().mockImplementation(() => ({
   ),
   signOut: vi.fn(),
   confirmRegistration: vi.fn(),
-  forgotPassword: vi.fn(),
-  confirmPassword: vi.fn(),
+  forgotPassword: vi.fn(
+    (cb: {
+      inputVerificationCode?: () => void;
+      onSuccess: () => void;
+      onFailure: (e: Error) => void;
+    }) => {
+      if (state.authError) return cb.onFailure(state.authError);
+      // The real SDK fires inputVerificationCode once the code email is sent.
+      if (cb.inputVerificationCode) return cb.inputVerificationCode();
+      cb.onSuccess();
+    },
+  ),
+  confirmPassword: vi.fn(
+    (
+      _code: string,
+      _newPassword: string,
+      cb: { onSuccess: () => void; onFailure: (e: Error) => void },
+    ) => {
+      if (state.authError) return cb.onFailure(state.authError);
+      cb.onSuccess();
+    },
+  ),
 }));
 
 export const AuthenticationDetails = vi.fn();
