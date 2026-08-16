@@ -133,9 +133,10 @@ describe('AuthContext', () => {
       screen.getByText('login').click();
     });
     if (loginResult?.kind !== 'newPasswordRequired') throw new Error('expected challenge');
+    const challenge = loginResult;
 
     await act(async () => {
-      await loginResult!.complete('New-Password-123!', { given_name: 'Ben', family_name: 'Kile' });
+      await challenge.complete('New-Password-123!', { given_name: 'Ben', family_name: 'Kile' });
     });
     expect(innerComplete).toHaveBeenCalledWith('New-Password-123!', {
       given_name: 'Ben',
