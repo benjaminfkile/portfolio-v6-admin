@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Alert, Box, Button, Card, CardContent, TextField, Typography } from '@mui/material';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import type { SignInResult } from '../lib/cognitoClient';
 
@@ -99,7 +100,7 @@ export default function LoginPage() {
     challenge?.kind === 'newPasswordRequired'
       ? 'Your temporary password must be replaced before continuing. Minimum 12 characters with upper, lower, number, and symbol (spec §5.1).'
       : challenge?.kind === 'totpSetupRequired'
-        ? 'Add the secret below to an authenticator app (Google Authenticator, 1Password, …), then enter the 6-digit code it shows.'
+        ? 'Scan the QR code with an authenticator app (Google Authenticator, 1Password, …), then enter the 6-digit code it shows.'
         : challenge?.kind === 'totpRequired'
           ? 'Enter the current 6-digit code from your authenticator app.'
           : 'Sign in to manage site content.';
@@ -209,11 +210,24 @@ export default function LoginPage() {
           {(challenge?.kind === 'totpSetupRequired' || challenge?.kind === 'totpRequired') && (
             <Box component="form" onSubmit={handleTotp} noValidate>
               {challenge.kind === 'totpSetupRequired' && (
-                <Alert severity="info" sx={{ mb: 2, wordBreak: 'break-all' }}>
-                  <Typography component="code" sx={{ fontFamily: 'monospace' }}>
-                    {challenge.secret}
-                  </Typography>
-                </Alert>
+                <>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                    {/* Standard otpauth:// payload — scannable by any TOTP app.
+                        White quiet zone keeps it readable on the dark theme. */}
+                    <Box sx={{ bgcolor: '#fff', p: 1.5, borderRadius: 1, lineHeight: 0 }}>
+                      <QRCodeSVG
+                        value={`otpauth://totp/${encodeURIComponent('portfolio-v6-admin')}:${encodeURIComponent(email)}?secret=${challenge.secret}&issuer=${encodeURIComponent('portfolio-v6-admin')}`}
+                        size={180}
+                      />
+                    </Box>
+                  </Box>
+                  <Alert severity="info" sx={{ mb: 2, wordBreak: 'break-all' }}>
+                    Can&apos;t scan? Enter this secret manually:{' '}
+                    <Typography component="code" sx={{ fontFamily: 'monospace' }}>
+                      {challenge.secret}
+                    </Typography>
+                  </Alert>
+                </>
               )}
               <TextField
                 label="6-digit code"
