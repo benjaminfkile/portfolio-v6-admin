@@ -93,6 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCurrentUser(userFromToken(result.idToken, email));
         return result;
       }
+      if (result.kind === 'newPasswordRequired') {
+        // Two-argument continuation: dropping `attributes` here would strip the
+        // pool-required attributes (given_name, family_name) the login page
+        // collected, failing the challenge with "Invalid attributes given".
+        return {
+          ...result,
+          complete: async (newPassword: string, attributes?: Record<string, string>) =>
+            finish(await result.complete(newPassword, attributes)),
+        };
+      }
       return {
         ...result,
         complete: async (value: string) => finish(await result.complete(value)),

@@ -92,6 +92,57 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('alice@example.com');
   });
 
+  test('login forwards new-password attributes through the challenge wrapper', async () => {
+    // Regression: the wrapper used to re-expose complete as (value) => …,
+    // silently dropping the attributes argument — Cognito then failed with
+    // "Invalid attributes given, given_name is missing" despite the form
+    // collecting the names.
+    mockGetIdToken.mockResolvedValue(null);
+    const innerComplete = vi
+      .fn()
+      .mockResolvedValue({ kind: 'success' as const, idToken: 'jwt-token' });
+    mockSignIn.mockResolvedValue({
+      kind: 'newPasswordRequired',
+      missingAttributes: ['given_name', 'family_name'],
+      complete: innerComplete,
+    });
+
+    let loginResult: Awaited<ReturnType<typeof signIn>> | undefined;
+    function ChallengeConsumer() {
+      const { login } = useAuth();
+      return (
+        <button
+          onClick={() => {
+            void login('alice@example.com', 'temp-password').then((r) => {
+              loginResult = r;
+            });
+          }}
+        >
+          login
+        </button>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <ChallengeConsumer />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      screen.getByText('login').click();
+    });
+    if (loginResult?.kind !== 'newPasswordRequired') throw new Error('expected challenge');
+
+    await act(async () => {
+      await loginResult!.complete('New-Password-123!', { given_name: 'Ben', family_name: 'Kile' });
+    });
+    expect(innerComplete).toHaveBeenCalledWith('New-Password-123!', {
+      given_name: 'Ben',
+      family_name: 'Kile',
+    });
+  });
+
   test('logout signs out and clears the current user', async () => {
     mockGetIdToken.mockResolvedValue('jwt-token');
 
