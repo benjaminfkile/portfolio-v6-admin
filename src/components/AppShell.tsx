@@ -39,7 +39,7 @@ interface NavItem {
   icon: ReactNode;
 }
 
-// App shell navigation (spec §8.3). Sibling tasks build the CRUD out on these routes.
+// App shell navigation (spec §8.3).
 const NAV_ITEMS: NavItem[] = [
   { label: 'Pages', path: '/pages', icon: <AutoStoriesIcon /> },
   { label: 'Sections', path: '/sections', icon: <ViewQuiltIcon /> },

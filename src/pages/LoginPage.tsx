@@ -24,9 +24,12 @@ const ATTRIBUTE_LABELS: Record<string, string> = {
 };
 
 // MUI login page (spec §5.2). SRP sign-in via AuthContext. Admin-created users
-// (§5.1) answer a new-password challenge on first login, and the prod pool adds
-// TOTP setup/entry; each challenge renders as its own step. On success, return
-// to the originally requested route (or the section editor by default).
+// (§5.1) answer a new-password challenge on first login (collecting any
+// pool-required attributes), and the prod pool adds TOTP setup (QR code) /
+// entry; each challenge renders as its own step. A forgot-password flow
+// (emailed code → new password) is reachable from the credentials form. On
+// success, return to the originally requested route (or the section editor by
+// default).
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();

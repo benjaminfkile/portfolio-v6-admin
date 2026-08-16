@@ -16,7 +16,8 @@ import {
 // answers a NEW_PASSWORD_REQUIRED challenge, and prod logins answer MFA_SETUP
 // (first time) or SOFTWARE_TOKEN_MFA (thereafter). `signIn` surfaces each
 // challenge as a value with a `complete` continuation instead of resolving a
-// token directly.
+// token directly. Standalone `requestPasswordReset`/`confirmPasswordReset`
+// cover self-service recovery via an emailed verification code.
 //
 // The pool is created lazily on first use rather than at import time, so importing this
 // module never throws when the env vars are absent (e.g. under test auto-mocking).
