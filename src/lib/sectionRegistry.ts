@@ -109,7 +109,6 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       { key: 'date_range', label: 'Date range', kind: 'text', required: true },
       { key: 'title', label: 'Title', kind: 'text', required: true },
       { key: 'description', label: 'Description', kind: 'multiline', required: true },
-      { key: 'media_id', label: 'Media', kind: 'media' },
     ],
     defaultData: {},
     defaultItemData: { date_range: '', title: '', description: '' },

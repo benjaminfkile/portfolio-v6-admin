@@ -76,14 +76,27 @@ export default function ItemsEditor({
     }
   };
 
+  // Drop any keys that are not declared in the current registry itemFields — an item
+  // loaded before a field was removed (e.g. timeline's `media_id` in task #82) would
+  // otherwise round-trip a stale key back to the API's now-strict schema and 400.
+  const stripUnknownKeys = (data: ItemData): ItemData => {
+    const allowed = new Set(fields.map((f) => f.key));
+    const next: ItemData = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (allowed.has(key)) next[key] = value;
+    }
+    return next;
+  };
+
   const handleSave = async (data: ItemData) => {
     setSaving(true);
+    const clean = stripUnknownKeys(data);
     try {
       if (editing?.mode === 'create') {
-        await createItem(section.id, data);
+        await createItem(section.id, clean);
       } else if (editing?.mode === 'edit') {
         await updateItem(editing.item.id, {
-          data,
+          data: clean,
           expected_updated_at: editing.item.updated_at,
         });
       }
