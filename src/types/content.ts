@@ -158,7 +158,6 @@ export interface TimelineItemData {
   date_range: string;
   title: string;
   description: string;
-  media_id?: string;
 }
 
 /**

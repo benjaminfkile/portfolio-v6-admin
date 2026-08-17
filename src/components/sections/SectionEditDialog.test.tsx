@@ -201,4 +201,30 @@ describe('ItemEditDialog — renders item fields for item-bearing types (§3.4)'
     // The media field now opens the reusable MediaPicker (task #446): a "Choose…" button.
     expect(screen.getByRole('button', { name: /choose/i })).toBeInTheDocument();
   });
+
+  // Task #82: timeline entries no longer carry an image — the API dropped media_id from the
+  // timeline item schema. The editor exposes only date range, title, and description.
+  it('renders timeline entry fields with no media picker (task #82)', () => {
+    const def = getSectionTypeDef('timeline');
+    render(
+      <ItemEditDialog
+        open
+        title="Add entry"
+        fields={def.itemFields!}
+        initialData={{ ...def.defaultItemData }}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText('Date range').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Title').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Description').length).toBeGreaterThan(0);
+    // No media field: no "Media" label, no MediaPicker "Choose…" button.
+    expect(screen.queryByText('Media')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /choose/i })).not.toBeInTheDocument();
+    // The registry no longer carries a media_id field for timeline items.
+    expect(def.itemFields!.some((f) => f.key === 'media_id')).toBe(false);
+  });
 });
