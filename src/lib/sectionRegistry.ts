@@ -305,6 +305,21 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     ],
     defaultData: {},
   },
+  resume: {
+    type: 'resume',
+    label: 'Resume (live)',
+    hasItems: false,
+    fields: [
+      { key: 'heading', label: 'Heading', kind: 'text' },
+      {
+        key: 'intro',
+        label: 'Intro',
+        kind: 'multiline',
+        helperText: 'Optional lead-in text shown under the heading',
+      },
+    ],
+    defaultData: {},
+  },
 };
 
 /** Ordered list of every section type, for the create-section type picker. */

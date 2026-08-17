@@ -45,7 +45,8 @@ export type SectionType =
   | 'duolingo'
   | 'github'
   | 'ops'
-  | 'contact';
+  | 'contact'
+  | 'resume';
 
 /* -- Section `data` shapes ---------------------------------------------------------- */
 
@@ -152,6 +153,15 @@ export interface ContactData {
   links?: Link[];
 }
 
+/**
+ * resume — live section: config only. Heading + optional intro; the newest confirmed resume
+ * PDF (from `/api/resume`) is what the public site serves as the download link.
+ */
+export interface ResumeData {
+  heading?: string;
+  intro?: string;
+}
+
 /* -- Section `section_items[].data` shapes (§3.4) ----------------------------------- */
 
 export interface TimelineItemData {
@@ -230,7 +240,8 @@ export type Section =
   | SectionBase<'duolingo', DuolingoData>
   | SectionBase<'github', GithubData>
   | SectionBase<'ops', OpsData>
-  | SectionBase<'contact', ContactData>;
+  | SectionBase<'contact', ContactData>
+  | SectionBase<'resume', ResumeData>;
 
 /* ------------------------------------------------------- Post body blocks (§3.7) --- */
 
