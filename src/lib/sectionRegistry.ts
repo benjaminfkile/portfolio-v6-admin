@@ -72,7 +72,7 @@ export interface SectionTypeDef {
   defaultItemData?: ItemData;
 }
 
-const LINK_HELPER = 'label is required; url must be http(s)';
+const LINK_HELPER = 'label is required; url can be http(s), mailto:, or tel: (bare emails and phone numbers are auto-prefixed)';
 
 export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
   hero: {

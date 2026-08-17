@@ -20,7 +20,9 @@
  * project can span several repos, a dev and a prod deployment, docs, etc. `label` is
  * required and NOT derived from `type` (five `repo` links are otherwise indistinguishable);
  * `type` drives icon/grouping, `label` says which one. Array order is display order.
- * Validation (API-side): protocol allowlist of `http`/`https` only.
+ * Validation (API-side): protocol allowlist of `http`/`https` (web links) plus
+ * `mailto`/`tel` (contact links) — no new `type` enum values, just a wider set of
+ * accepted URL schemes.
  */
 export interface Link {
   type: 'repo' | 'prod' | 'dev' | 'docs' | 'demo' | 'package' | 'article' | 'other';
