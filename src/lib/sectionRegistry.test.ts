@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SECTION_TYPES, getSectionTypeDef } from './sectionRegistry';
+import { SECTION_TYPES, SECTION_TYPE_LIST, getSectionTypeDef } from './sectionRegistry';
 
 describe('sectionRegistry — portfolio Skill Refs v1.8', () => {
   const portfolio = SECTION_TYPES.portfolio;
@@ -56,5 +56,30 @@ describe('sectionRegistry — github GitHub Explorer v1.10', () => {
 
   it('default github data no longer seeds a weeks window', () => {
     expect('weeks' in github.defaultData).toBe(false);
+  });
+});
+
+describe('sectionRegistry — resume (live)', () => {
+  const resume = SECTION_TYPES.resume;
+
+  it('registers a resume section type with heading + intro and no items', () => {
+    expect(resume).toBeDefined();
+    expect(resume.type).toBe('resume');
+    expect(resume.hasItems).toBe(false);
+    expect(resume.itemFields).toBeUndefined();
+    expect(resume.fields.map((f) => f.key)).toEqual(['heading', 'intro']);
+    // Intro is a multiline block so admins can drop in a short paragraph.
+    const intro = resume.fields.find((f) => f.key === 'intro');
+    expect(intro?.kind).toBe('multiline');
+  });
+
+  it('is placeable via getSectionTypeDef and appears in the ordered type list', () => {
+    expect(getSectionTypeDef('resume')).toBe(resume);
+    // Present in the picker list so it is placeable on a page like other live sections.
+    expect(SECTION_TYPE_LIST.some((d) => d.type === 'resume')).toBe(true);
+  });
+
+  it('carries an empty default data blob (no required config)', () => {
+    expect(resume.defaultData).toEqual({});
   });
 });
