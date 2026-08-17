@@ -1,12 +1,15 @@
 /**
  * Reusable Link[] editor (§3.4). Rows of { type (select over the 8 link types), label
- * (required), url (http/https only) } with add, remove, and drag-reorder. This is the
- * single implementation the portfolio item form uses now and the blog `links` block
- * (§3.7) will reuse later — hence it takes a plain `value`/`onChange` pair and knows
- * nothing about sections.
+ * (required), url (http/https for web links, mailto/tel for contact links) } with add,
+ * remove, and drag-reorder. This is the single implementation the portfolio item form
+ * uses now and the blog `links` block (§3.7) will reuse later — hence it takes a plain
+ * `value`/`onChange` pair and knows nothing about sections.
  *
- * Validation is surfaced inline per row; the parent gates its Save button on
- * {@link areLinksValid} so invalid content can reach neither a draft nor production.
+ * The URL field auto-prefixes bare emails/phone numbers on blur (`ben@example.com` →
+ * `mailto:ben@example.com`, `(406) 555-1234` → `tel:4065551234`) so contact links can
+ * be typed the way people actually write them. Validation is surfaced inline per row;
+ * the parent gates its Save button on {@link areLinksValid} so invalid content can
+ * reach neither a draft nor production.
  */
 import {
   Box,
@@ -21,7 +24,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import AddLinkIcon from '@mui/icons-material/AddLink';
 import type { Link } from '../../types/content';
-import { validateLink } from '../../lib/reorder';
+import { normalizeLinkUrl, validateLink } from '../../lib/reorder';
 import SortableList, { type DragHandleProps } from '../dnd/SortableList';
 
 const LINK_TYPES: Link['type'][] = [
@@ -127,8 +130,15 @@ export default function LinkEditor({ value, onChange }: LinkEditorProps) {
                 fullWidth
                 value={row.link.url}
                 onChange={(e) => setAt(row.index, { ...row.link, url: e.target.value })}
+                onBlur={() => {
+                  const normalized = normalizeLinkUrl(row.link.url);
+                  if (normalized !== row.link.url) {
+                    setAt(row.index, { ...row.link, url: normalized });
+                  }
+                }}
                 error={Boolean(errors.url)}
-                helperText={errors.url}
+                helperText={errors.url ?? 'https://…, an email address, or a phone number'}
+                placeholder="https://example.com"
               />
               <IconButton
                 size="small"

@@ -84,7 +84,7 @@ export function validateData(fields: FieldDef[], data: Record<string, unknown>):
       }
     }
     if (field.kind === 'links' && Array.isArray(value) && !areLinksValid(value as Link[])) {
-      problems.push(`${field.label}: every link needs a label and an http(s) URL`);
+      problems.push(`${field.label}: every link needs a label and a URL, email, or phone number`);
     }
   }
   return problems;
