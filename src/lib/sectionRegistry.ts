@@ -53,6 +53,15 @@ export interface FieldDef {
    * is one click.
    */
   lightSourceKey?: string;
+  /**
+   * Conditionally hide this field based on another key in the same `data` blob. When set,
+   * the field is only rendered (and only validated) if the sibling key matches one of the
+   * given values — `undefined` in `values` matches an absent key so a field can be shown
+   * for "old" data that pre-dates a mode switch (see blog `mode` — teaser-only knobs stay
+   * visible when `mode` is absent). Written as `showWhen` rather than `hideWhen` so the
+   * default (no config) is "always show", matching every existing field's behaviour.
+   */
+  showWhen?: { key: string; values: (string | undefined)[] };
 }
 
 export interface SectionTypeDef {
@@ -216,7 +225,41 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     label: 'Blog (live)',
     hasItems: false,
     fields: [
-      { key: 'limit', label: 'Number of posts', kind: 'number', required: true, min: 1, integer: true },
+      {
+        key: 'mode',
+        label: 'Mode',
+        kind: 'select',
+        required: true,
+        options: [
+          { value: 'teaser', label: 'Teaser (recent posts)' },
+          { value: 'index', label: 'Full index (paginated listing)' },
+        ],
+        helperText:
+          'Teaser shows the newest posts as a homepage card. Index turns this section into ' +
+          'the full blog listing so it can be composed as its own page and ordered in the nav.',
+      },
+      {
+        key: 'limit',
+        label: 'Number of posts',
+        kind: 'number',
+        required: true,
+        min: 1,
+        integer: true,
+        // Teaser-only knob: `limit` bounds the teaser count. In index mode the listing paginates
+        // via `page_size` instead, so hide the field entirely rather than confuse the two.
+        // `undefined` matches pre-mode data so existing teaser sections keep their editor unchanged.
+        showWhen: { key: 'mode', values: ['teaser', undefined] },
+      },
+      {
+        key: 'page_size',
+        label: 'Posts per page',
+        kind: 'number',
+        required: true,
+        min: 1,
+        integer: true,
+        helperText: 'How many posts to show per index page before paginating.',
+        showWhen: { key: 'mode', values: ['index'] },
+      },
       {
         key: 'blog',
         label: 'Blog',
@@ -227,7 +270,9 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       },
       { key: 'tag', label: 'Tag filter', kind: 'text' },
     ],
-    defaultData: { limit: 3 },
+    // Default a freshly created blog section to teaser mode so it works out of the box; existing
+    // sections that pre-date `mode` remain valid without one and are treated as teaser too.
+    defaultData: { mode: 'teaser', limit: 3 },
   },
   now_playing: {
     type: 'now_playing',

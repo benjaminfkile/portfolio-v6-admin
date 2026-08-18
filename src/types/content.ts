@@ -98,11 +98,19 @@ export interface StatusData {
 }
 
 /**
- * blog — live section (§3.5): config only. How many posts, optional tag filter; the
- * listing is fetched from `GET /api/posts` at runtime.
+ * blog — live section (§3.5): config only. `mode` picks between the two renderings:
+ * `teaser` (the default, backwards-compatible with pre-mode blog sections) shows the
+ * newest `limit` posts as a homepage/landing teaser; `index` renders the section as
+ * the full blog index/listing so the Blog can be composed as its own admin-managed
+ * page and ordered in the nav like any other page. `page_size` bounds how many posts
+ * a single index page shows before paginating (index mode only). The listing itself is
+ * fetched from `GET /api/posts` at runtime — only the config is published.
  */
 export interface BlogData {
-  limit: number;
+  mode?: 'teaser' | 'index';
+  limit?: number;
+  page_size?: number;
+  blog?: string;
   tag?: string;
 }
 
