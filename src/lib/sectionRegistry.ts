@@ -89,11 +89,14 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     label: 'Hero',
     hasItems: false,
     fields: [
-      { key: 'title', label: 'Title', kind: 'text', required: true },
+      // Task #108: no section requires a heading — hero's title (which serves as the section
+      // heading) is optional. The API accepts an empty/absent title and the site no longer
+      // substitutes fallback copy for it.
+      { key: 'title', label: 'Title', kind: 'text' },
       { key: 'tagline', label: 'Tagline', kind: 'text' },
       { key: 'background_media_id', label: 'Background media', kind: 'media' },
     ],
-    defaultData: { title: '' },
+    defaultData: {},
   },
   about: {
     type: 'about',
