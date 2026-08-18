@@ -143,11 +143,13 @@ describe('SectionEditDialog — skills sphere_detail (v1.5)', () => {
 describe('SectionEditDialog — save gating', () => {
   it('disables Save while a required field is empty and enables it once filled', () => {
     const onSave = vi.fn();
-    // hero requires `title`; start empty → Save disabled.
+    // about requires `body`; start empty → Save disabled.
+    // (Since task #108 no section-level heading/title/eyebrow is required — we exercise
+    //  save gating against a structural required field instead.)
     render(
       <SectionEditDialog
         open
-        section={makeSection('hero')}
+        section={makeSection('about')}
         saving={false}
         onSave={onSave}
         onClose={vi.fn()}
@@ -160,13 +162,87 @@ describe('SectionEditDialog — save gating', () => {
     render(
       <SectionEditDialog
         open
-        section={{ ...makeSection('hero'), data: { title: 'Hi' } }}
+        section={makeSection('hero')}
         saving
         onSave={vi.fn()}
         onClose={vi.fn()}
       />,
     );
     expect(screen.getByRole('button', { name: /saving/i })).toBeDisabled();
+  });
+});
+
+// Task #108 — Ben's rule: NOTHING requires a heading. Hero's title (and every other
+// section's heading/title/eyebrow) is optional; a blank input is OMITTED from the saved
+// data blob, not sent as an empty string.
+describe('SectionEditDialog — no section requires a heading (task #108)', () => {
+  it('hero can be saved with no title — Save enabled from a fresh section', () => {
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection('hero')}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    // No required section-level field means Save is enabled on a fresh hero.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('a blank title is OMITTED from the saved data blob (not sent as an empty string)', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection('hero')}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const saved = onSave.mock.calls[0][0] as Record<string, unknown>;
+    expect('title' in saved).toBe(false);
+  });
+
+  it('clearing an existing title drops the key from the saved data blob', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={{ ...makeSection('hero'), data: { title: 'Old title' } }}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Clear the title input; the empty value must NOT round-trip as ''.
+    await user.clear(screen.getByLabelText(/title/i));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const saved = onSave.mock.calls[0][0] as Record<string, unknown>;
+    expect('title' in saved).toBe(false);
+  });
+
+  it('no section-level heading/title/eyebrow field is marked required in the registry', () => {
+    // The set of keys we consider "header copy": heading, title, eyebrow. Regardless of
+    // section type, none of these should ever gate a section save.
+    const HEADER_COPY_KEYS = new Set(['heading', 'title', 'eyebrow']);
+    for (const def of SECTION_TYPE_LIST) {
+      for (const field of def.fields) {
+        if (HEADER_COPY_KEYS.has(field.key)) {
+          expect(field.required).toBeFalsy();
+        }
+      }
+    }
   });
 });
 

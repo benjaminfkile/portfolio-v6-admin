@@ -34,7 +34,10 @@ export default function FieldRenderer({ field, value, data, onChange }: FieldRen
           label={field.label}
           required={field.required}
           value={(value as string) ?? ''}
-          onChange={(e) => set(e.target.value)}
+          // Empty input → undefined so DataFieldsForm drops the key from the data blob
+          // (mirrors the number field). Optional headings/titles never round-trip as
+          // empty strings — the key is simply absent (task #108).
+          onChange={(e) => set(e.target.value === '' ? undefined : e.target.value)}
           multiline={field.kind === 'multiline'}
           minRows={field.kind === 'multiline' ? 3 : undefined}
           fullWidth
