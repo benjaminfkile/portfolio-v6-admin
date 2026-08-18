@@ -40,8 +40,40 @@ describe('sectionRegistry — blog Blogs v1.13', () => {
     expect(field?.helperText).toMatch(/publish fails if the selected blog slug no longer exists/i);
   });
 
-  it('keeps the existing limit and tag controls alongside the new blog field', () => {
-    expect(blog.fields.map((f) => f.key)).toEqual(['limit', 'blog', 'tag']);
+  it('keeps the existing limit and tag controls alongside mode/page_size and the blog field', () => {
+    // task #103: mode comes first so the teaser/index switch is the first knob; limit and
+    // page_size are alternative teaser/index-only knobs sitting under it.
+    expect(blog.fields.map((f) => f.key)).toEqual([
+      'mode',
+      'limit',
+      'page_size',
+      'blog',
+      'tag',
+    ]);
+  });
+});
+
+describe('sectionRegistry — blog teaser/index mode (task #103)', () => {
+  const blog = SECTION_TYPES.blog;
+
+  it('exposes a required mode select with teaser and index options', () => {
+    const mode = blog.fields.find((f) => f.key === 'mode');
+    expect(mode).toBeDefined();
+    expect(mode?.kind).toBe('select');
+    expect(mode?.required).toBe(true);
+    expect(mode?.options?.map((o) => o.value)).toEqual(['teaser', 'index']);
+  });
+
+  it('defaults a freshly created section to teaser mode', () => {
+    expect(blog.defaultData).toMatchObject({ mode: 'teaser' });
+  });
+
+  it('hides limit in index mode and page_size in teaser mode via showWhen', () => {
+    const limit = blog.fields.find((f) => f.key === 'limit');
+    const pageSize = blog.fields.find((f) => f.key === 'page_size');
+    // Teaser-only: also visible when mode is absent so pre-mode sections open unchanged.
+    expect(limit?.showWhen).toEqual({ key: 'mode', values: ['teaser', undefined] });
+    expect(pageSize?.showWhen).toEqual({ key: 'mode', values: ['index'] });
   });
 });
 

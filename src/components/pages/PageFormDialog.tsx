@@ -4,9 +4,10 @@
  * the caller sends the change with `expected_updated_at` (§4.5).
  *
  * The slug rules are enforced client-side as a *hint* only — lowercase letters/digits/hyphens
- * and not one of the reserved slugs (`blog`, `api`, `admin`). The server is authoritative
- * (it also owns uniqueness), so a `serverError` handed back from a rejected write is surfaced
- * inline rather than swallowed. Themed via MUI only (§14.4).
+ * and not one of the reserved slugs (`api`, `admin`). The server is authoritative (it also owns
+ * uniqueness), so a `serverError` handed back from a rejected write is surfaced inline rather
+ * than swallowed. `blog` is NOT reserved: with the blog section's `mode: 'index'`, the Blog is
+ * composed as an admin page and needs its own slug. Themed via MUI only (§14.4).
  */
 import { useEffect, useState } from 'react';
 import {
@@ -21,8 +22,12 @@ import {
 } from '@mui/material';
 import type { Page } from '../../types/admin';
 
-/** Reserved slugs rejected on create/rename (§3.10): they collide with real routes. */
-export const RESERVED_SLUGS = ['blog', 'api', 'admin'] as const;
+/**
+ * Reserved slugs rejected on create/rename (§3.10): they collide with real routes.
+ * `blog` was reserved historically but was unreserved alongside the blog-as-a-page
+ * change, so the Blog can be composed as an admin page like any other.
+ */
+export const RESERVED_SLUGS = ['api', 'admin'] as const;
 const SLUG_RE = /^[a-z0-9-]+$/;
 
 /** Client-side slug hint. Returns an error string, or '' when the slug is acceptable. */

@@ -15,6 +15,18 @@ interface DataFieldsFormProps {
   onChange: (next: Record<string, unknown>) => void;
 }
 
+/**
+ * True when a field's `showWhen` predicate (if any) matches the current data. Absent
+ * predicate → always visible. An `undefined` entry in `values` matches an absent key,
+ * so a field can be shown for legacy data that pre-dates the switching key.
+ */
+function isFieldVisible(field: FieldDef, data: Record<string, unknown>): boolean {
+  if (!field.showWhen) return true;
+  const raw = data[field.showWhen.key];
+  const current = raw === undefined ? undefined : String(raw);
+  return field.showWhen.values.some((v) => v === current);
+}
+
 export default function DataFieldsForm({ fields, data, onChange }: DataFieldsFormProps) {
   const setField = (key: string, value: unknown) => {
     const next = { ...data };
@@ -28,7 +40,7 @@ export default function DataFieldsForm({ fields, data, onChange }: DataFieldsFor
 
   return (
     <Stack spacing={2.5} sx={{ mt: 1 }}>
-      {fields.map((field) => (
+      {fields.filter((f) => isFieldVisible(f, data)).map((field) => (
         <FieldRenderer
           key={field.key}
           field={field}
@@ -49,6 +61,9 @@ export default function DataFieldsForm({ fields, data, onChange }: DataFieldsFor
 export function validateData(fields: FieldDef[], data: Record<string, unknown>): string[] {
   const problems: string[] = [];
   for (const field of fields) {
+    // A hidden field (per showWhen) isn't rendered, so it must not gate save either —
+    // otherwise a required teaser-only knob would forever block index-mode saves.
+    if (!isFieldVisible(field, data)) continue;
     const value = data[field.key];
     if (
       field.required &&
