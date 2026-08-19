@@ -140,7 +140,9 @@ function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
     expires_at,
   } = integration;
 
-  const chip = STATE_CHIP[state];
+  // Guard the lookup: an API state this build doesn't know must degrade to a
+  // neutral chip, never crash the whole page (the 2026-08-19 prod white-screen).
+  const chip = STATE_CHIP[state] ?? { color: 'default' as const, label: 'Unknown' };
   const daysLeft = expires_at ? daysUntil(expires_at) : null;
   const expired = daysLeft != null && daysLeft < 0;
   const expiryWarning =
@@ -346,6 +348,8 @@ function renderStateDetail(
       return 'Not connected.';
     case 'disabled':
       return 'Disabled by admin.';
+    default:
+      return 'Status unavailable.';
   }
 }
 
