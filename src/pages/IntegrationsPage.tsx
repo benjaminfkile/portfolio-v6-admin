@@ -2,12 +2,15 @@
  * Integrations (§4.7) — one card per integration, driven by the API's list.
  *
  * The card's `auth_kind` decides the control:
- *  - oauth (Spotify): the reconnect round-trip. Connect navigates this tab to the
- *    provider's consent page; the API's callback stores the new token and redirects
- *    back here with `?spotify=connected|error`, surfaced as a toast. Spotify expires
- *    refresh tokens 180 days after authorization and degrades SILENTLY, so this card
- *    also shows when the authorization expires, warns when it is close, and flags the
- *    untracked static-secret fallback.
+ *  - oauth (Spotify): a runtime-truthful state machine (§4.7 overhaul). The card
+ *    surfaces the API's `state` verbatim — it never infers "Connected" from the
+ *    mere presence of a credential; that shortcut lied for days when the token was
+ *    dead and the service suspended. Connect navigates this tab to Spotify's
+ *    consent page; the API's callback stores the new token and redirects back here
+ *    with `?spotify=connected|error`, surfaced as a toast. Spotify refresh tokens
+ *    expire 180 days after authorization, so the grant block also renders the
+ *    countdown and warns inside 14 days. Disconnect drops the grant; Disable is a
+ *    kill switch (the API stops calling Spotify entirely until re-enabled).
  *  - api_key (GitHub): a pasted secret, entered in a password field, never prefilled.
  *  - value (Duolingo): a non-secret string, entered in a plain text field.
  *
@@ -35,51 +38,117 @@ import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import PersonIcon from '@mui/icons-material/Person';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import BlockIcon from '@mui/icons-material/Block';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import {
   connectIntegration,
+  disableSpotify,
   disconnectIntegration,
+  disconnectSpotify,
+  enableSpotify,
   getIntegrations,
   saveIntegrationValue,
 } from '../api/integrationsApi';
-import type { Integration } from '../api/integrationsApi';
+import type {
+  CredentialIntegration,
+  Integration,
+  SpotifyIntegration,
+  SpotifyState,
+} from '../api/integrationsApi';
 import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ApiKeysSection from '../components/apiKeys/ApiKeysSection';
 
-/** Below this many days remaining, the expiry line escalates to a warning. */
-export const EXPIRY_WARNING_DAYS = 30;
+/** Below this many days remaining, the grant expiry line escalates to a warning (§4.7 overhaul). */
+export const GRANT_EXPIRY_WARNING_DAYS = 14;
 
 function daysUntil(iso: string): number {
   return Math.floor((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
+/**
+ * Coarse "N units ago / from now" — good enough for status detail lines where the
+ * exact second doesn't matter. Skips seconds under a minute (just "moments ago")
+ * so refetch jitter doesn't visibly wiggle the label.
+ */
+function formatRelative(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const abs = Math.abs(diffMs);
+  const suffix = diffMs >= 0 ? 'ago' : 'from now';
+  const minutes = Math.floor(abs / 60000);
+  if (minutes < 1) return `moments ${suffix}`;
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ${suffix}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ${suffix}`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ${suffix}`;
+}
+
+/** Short local date+time for `rate_limited_until` — a wall-clock the admin can read. */
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 /** Helper text under a credential field — keyed by kind, not by integration. */
-const HELPER_TEXT: Record<Integration['auth_kind'], string> = {
-  oauth: '',
+const HELPER_TEXT: Record<'api_key' | 'value', string> = {
   api_key: 'Personal access token — public data only (read:user)',
   value: 'Duolingo username (public)',
 };
 
-interface CardProps {
-  integration: Integration;
-  /** Refetch the whole list after a mutation. */
+/** Chip color per Spotify state, per the §4.7 overhaul palette. */
+const STATE_CHIP: Record<SpotifyState, { color: 'default' | 'success' | 'error' | 'warning'; label: string }> = {
+  connected: { color: 'success', label: 'Connected' },
+  auth_broken: { color: 'error', label: 'Authorization broken' },
+  rate_limited: { color: 'warning', label: 'Rate limited' },
+  disconnected: { color: 'default', label: 'Not connected' },
+  disabled: { color: 'default', label: 'Disabled' },
+};
+
+interface OAuthCardProps {
+  integration: SpotifyIntegration;
   onReload: () => Promise<void>;
   onToast: (message: string) => void;
 }
 
 /**
- * The oauth card (Spotify): reconnect round-trip, expiry countdown/warnings, the
- * untracked-secret flag, and a confirmed disconnect. Preserves §4.6 behavior verbatim.
+ * The Spotify card: renders the API's state verbatim, surfaces the underlying
+ * grant's 180-day expiry countdown, and exposes Connect/Reconnect + Disconnect +
+ * Disable/Enable. Buttons show/enable per state (e.g. Disconnect hidden when the
+ * state is already `disconnected` or `disabled`; Reconnect hidden when disabled).
  */
-function OAuthCard({ integration, onReload, onToast }: CardProps) {
+function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
   const [connecting, setConnecting] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmDisable, setConfirmDisable] = useState(false);
+  const [toggling, setToggling] = useState(false);
 
-  const { key, name, connected, source, authorized_at, expires_at } = integration;
-  const days = expires_at ? daysUntil(expires_at) : null;
-  const expired = days != null && days < 0;
+  const {
+    key,
+    name,
+    state,
+    last_success_at,
+    last_error,
+    rate_limited_until,
+    authorized_at,
+    expires_at,
+  } = integration;
+
+  const chip = STATE_CHIP[state];
+  const daysLeft = expires_at ? daysUntil(expires_at) : null;
+  const expired = daysLeft != null && daysLeft < 0;
+  const expiryWarning =
+    daysLeft != null && daysLeft >= 0 && daysLeft < GRANT_EXPIRY_WARNING_DAYS;
+
+  const canReconnect = state !== 'disabled';
+  const canDisconnect = state !== 'disconnected' && state !== 'disabled';
+  const connectLabel = state === 'disconnected' ? `Connect ${name}` : `Reconnect ${name}`;
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -97,7 +166,7 @@ function OAuthCard({ integration, onReload, onToast }: CardProps) {
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
-      await disconnectIntegration(key);
+      await disconnectSpotify();
       setConfirmDisconnect(false);
       onToast(`${name} was disconnected.`);
       await onReload();
@@ -108,6 +177,35 @@ function OAuthCard({ integration, onReload, onToast }: CardProps) {
     }
   };
 
+  const handleDisable = async () => {
+    setToggling(true);
+    try {
+      await disableSpotify();
+      setConfirmDisable(false);
+      onToast(`${name} was disabled.`);
+      await onReload();
+    } catch (err) {
+      onToast(serverMessage(err, `Could not disable ${name}.`));
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleEnable = async () => {
+    setToggling(true);
+    try {
+      await enableSpotify();
+      onToast(`${name} was enabled.`);
+      await onReload();
+    } catch (err) {
+      onToast(serverMessage(err, `Could not enable ${name}.`));
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const stateDetail = renderStateDetail(state, last_success_at, last_error, rate_limited_until);
+
   return (
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
@@ -115,59 +213,80 @@ function OAuthCard({ integration, onReload, onToast }: CardProps) {
         <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
           {name}
         </Typography>
-        {connected ? (
-          <Chip
-            size="small"
-            color={expired ? 'error' : 'success'}
-            label={expired ? 'Expired' : 'Connected'}
-            data-testid={`${key}-status-chip`}
-          />
-        ) : (
-          <Chip size="small" label="Not connected" data-testid={`${key}-status-chip`} />
-        )}
+        <Chip
+          size="small"
+          color={chip.color}
+          label={chip.label}
+          data-testid={`${key}-status-chip`}
+        />
       </Stack>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Powers the public site&apos;s now-playing section. When the authorization expires
-        the section silently shows nothing playing — reconnecting fixes it.
+        Powers the public site&apos;s now-playing section. Reconnect when the authorization
+        expires or breaks; disable to stop the API from calling Spotify at all.
       </Typography>
 
-      {source === 'admin' && authorized_at && expires_at && (
+      <Typography
+        variant="body2"
+        sx={{
+          mb: 2,
+          color: state === 'disabled' ? 'text.disabled' : 'text.primary',
+        }}
+        data-testid={`${key}-state-detail`}
+      >
+        {stateDetail}
+      </Typography>
+
+      {authorized_at && expires_at && (
         <Alert
-          severity={expired ? 'error' : days != null && days < EXPIRY_WARNING_DAYS ? 'warning' : 'info'}
+          severity={expired ? 'error' : expiryWarning ? 'warning' : 'info'}
           sx={{ mb: 2 }}
           data-testid={`${key}-expiry`}
         >
-          Authorized {formatDate(authorized_at)} — {' '}
+          Authorized {formatDate(authorized_at)} —{' '}
           {expired
-            ? `expired ${formatDate(expires_at)}. Reconnect now to bring now-playing back.`
-            : `expires ${formatDate(expires_at)} (${days} day${days === 1 ? '' : 's'} left).`}
+            ? `expired ${formatDate(expires_at)}. Reconnect to restore access.`
+            : `expires ${formatDate(expires_at)} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left).`}
         </Alert>
       )}
 
-      {source === 'secrets' && (
-        <Alert severity="warning" sx={{ mb: 2 }} data-testid={`${key}-expiry`}>
-          Using the static server-secret token, whose age is not tracked — it may expire
-          without warning. Reconnect here once to switch to a managed token with a visible
-          expiry date.
-        </Alert>
-      )}
-
-      <Stack direction="row" spacing={1}>
-        <Button variant="contained" onClick={() => void handleConnect()} disabled={connecting}>
-          {connecting
-            ? `Redirecting to ${name}…`
-            : source === 'admin'
-              ? `Reconnect ${name}`
-              : `Connect ${name}`}
-        </Button>
-        {source === 'admin' && (
+      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }} useFlexGap>
+        {canReconnect && (
+          <Button
+            variant="contained"
+            onClick={() => void handleConnect()}
+            disabled={connecting}
+          >
+            {connecting ? `Redirecting to ${name}…` : connectLabel}
+          </Button>
+        )}
+        {canDisconnect && (
           <Button
             color="warning"
             startIcon={<LinkOffIcon />}
             onClick={() => setConfirmDisconnect(true)}
+            disabled={disconnecting}
           >
             Disconnect
+          </Button>
+        )}
+        {state === 'disabled' ? (
+          <Button
+            color="primary"
+            startIcon={<PlayArrowIcon />}
+            onClick={() => void handleEnable()}
+            disabled={toggling}
+          >
+            {toggling ? 'Enabling…' : 'Enable'}
+          </Button>
+        ) : (
+          <Button
+            color="inherit"
+            startIcon={<BlockIcon />}
+            onClick={() => setConfirmDisable(true)}
+            disabled={toggling}
+          >
+            Disable
           </Button>
         )}
       </Stack>
@@ -185,8 +304,55 @@ function OAuthCard({ integration, onReload, onToast }: CardProps) {
           if (!disconnecting) setConfirmDisconnect(false);
         }}
       />
+
+      <ConfirmDialog
+        open={confirmDisable}
+        title={`Disable ${name}?`}
+        message={
+          `The API will stop calling ${name} until you re-enable it. The stored ` +
+          'authorization is kept, so Enable brings it back without reconnecting.'
+        }
+        confirmLabel={toggling ? 'Disabling…' : 'Disable'}
+        onConfirm={() => void handleDisable()}
+        onClose={() => {
+          if (!toggling) setConfirmDisable(false);
+        }}
+      />
     </Paper>
   );
+}
+
+/** State-specific detail line — the human-readable read of `state` + timestamps. */
+function renderStateDetail(
+  state: SpotifyState,
+  lastSuccessAt: string | null,
+  lastError: SpotifyIntegration['last_error'],
+  rateLimitedUntil: string | null,
+): string {
+  switch (state) {
+    case 'connected':
+      return lastSuccessAt
+        ? `Last successful fetch ${formatRelative(lastSuccessAt)}.`
+        : 'Connected.';
+    case 'auth_broken':
+      return lastError
+        ? `Authorization broken — reconnect. Last error ${formatRelative(lastError.at)}.`
+        : 'Authorization broken — reconnect.';
+    case 'rate_limited':
+      return rateLimitedUntil
+        ? `Rate limited until ${formatDateTime(rateLimitedUntil)}.`
+        : 'Rate limited.';
+    case 'disconnected':
+      return 'Not connected.';
+    case 'disabled':
+      return 'Disabled by admin.';
+  }
+}
+
+interface CredentialCardProps {
+  integration: CredentialIntegration;
+  onReload: () => Promise<void>;
+  onToast: (message: string) => void;
 }
 
 /**
@@ -194,7 +360,7 @@ function OAuthCard({ integration, onReload, onToast }: CardProps) {
  * for api_key, plain text for value), Save → PUT, and a confirmed disconnect. The stored
  * value is never displayed — a connected card shows "Connected · saved <date>" instead.
  */
-function CredentialCard({ integration, onReload, onToast }: CardProps) {
+function CredentialCard({ integration, onReload, onToast }: CredentialCardProps) {
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
