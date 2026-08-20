@@ -55,6 +55,7 @@ import {
 import type {
   CredentialIntegration,
   Integration,
+  SpotifyBudget,
   SpotifyIntegration,
   SpotifyListener,
   SpotifyState,
@@ -66,6 +67,9 @@ import ApiKeysSection from '../components/apiKeys/ApiKeysSection';
 
 /** Below this many days remaining, the grant expiry line escalates to a warning (§4.7 overhaul). */
 export const GRANT_EXPIRY_WARNING_DAYS = 14;
+
+/** Fraction of the daily API budget above which the row switches to a warning (task 125). */
+export const BUDGET_WARNING_FRACTION = 0.8;
 
 function daysUntil(iso: string): number {
   return Math.floor((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
@@ -114,6 +118,66 @@ const STATE_CHIP: Record<SpotifyState, { color: 'default' | 'success' | 'error' 
   disabled: { color: 'default', label: 'Disabled' },
 };
 
+/**
+ * Source badge (task 125) - which now-playing feed is actually answering right now.
+ * `listener` reads green because the event-driven path is the healthy default;
+ * `polling` reads amber because it is the degraded fallback; `none` reads neutral
+ * because "offline" overlaps with the legitimate disabled/disconnected states.
+ */
+const SOURCE_BADGE: Record<
+  'listener' | 'polling' | 'none',
+  { color: 'default' | 'success' | 'warning'; label: string }
+> = {
+  listener: { color: 'success', label: 'Live (listener)' },
+  polling: { color: 'warning', label: 'Polling (fallback)' },
+  none: { color: 'default', label: 'Offline' },
+};
+
+/** Human label per listener state (task 125). Unknown tags fall back to the raw tag. */
+const LISTENER_STATE_LABEL: Record<string, string> = {
+  idle: 'Idle',
+  connecting: 'Connecting',
+  connected: 'Connected',
+  backoff: 'Backing off',
+  credential_dead: 'Session cookie expired, replace it below',
+  no_credential: 'No credential',
+  unknown: 'Unknown',
+};
+
+interface BudgetRowProps {
+  budget: SpotifyBudget;
+}
+
+/**
+ * Renders the daily Spotify Web API budget as either a quiet secondary line or,
+ * once usage crosses BUDGET_WARNING_FRACTION, a warning Alert so the admin sees
+ * that we are close to Spotify's per-day cap before the runtime starts refusing
+ * calls. `cap <= 0` is treated as "no meaningful percentage" and stays quiet.
+ */
+function BudgetRow({ budget }: BudgetRowProps) {
+  const { used, cap, resets_at } = budget;
+  const fraction = cap > 0 ? used / cap : 0;
+  const warn = fraction > BUDGET_WARNING_FRACTION;
+  const line = `${used} of ${cap} daily API calls used, resets at ${formatDateTime(resets_at)}`;
+  if (warn) {
+    return (
+      <Alert severity="warning" sx={{ mb: 2 }} data-testid="spotify-budget">
+        {line}
+      </Alert>
+    );
+  }
+  return (
+    <Typography
+      variant="body2"
+      color="text.secondary"
+      sx={{ mb: 2 }}
+      data-testid="spotify-budget"
+    >
+      {line}
+    </Typography>
+  );
+}
+
 interface OAuthCardProps {
   integration: SpotifyIntegration;
   onReload: () => Promise<void>;
@@ -137,17 +201,23 @@ function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
     key,
     name,
     state,
+    source,
     last_success_at,
     last_error,
     rate_limited_until,
     authorized_at,
     expires_at,
     listener,
+    budget,
   } = integration;
 
   // Guard the lookup: an API state this build doesn't know must degrade to a
   // neutral chip, never crash the whole page (the 2026-08-19 prod white-screen).
   const chip = STATE_CHIP[state] ?? { color: 'default' as const, label: 'Unknown' };
+  const sourceBadge =
+    source && (source === 'listener' || source === 'polling' || source === 'none')
+      ? SOURCE_BADGE[source]
+      : null;
   const daysLeft = expires_at ? daysUntil(expires_at) : null;
   const expired = daysLeft != null && daysLeft < 0;
   const expiryWarning =
@@ -220,12 +290,22 @@ function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
         <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
           {name}
         </Typography>
-        <Chip
-          size="small"
-          color={chip.color}
-          label={chip.label}
-          data-testid={`${key}-status-chip`}
-        />
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'flex-end' }} useFlexGap>
+          {sourceBadge && (
+            <Chip
+              size="small"
+              color={sourceBadge.color}
+              label={sourceBadge.label}
+              data-testid={`${key}-source-badge`}
+            />
+          )}
+          <Chip
+            size="small"
+            color={chip.color}
+            label={chip.label}
+            data-testid={`${key}-status-chip`}
+          />
+        </Stack>
       </Stack>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -250,12 +330,14 @@ function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
           sx={{ mb: 2 }}
           data-testid={`${key}-expiry`}
         >
-          Authorized {formatDate(authorized_at)} —{' '}
+          Authorized {formatDate(authorized_at)} -{' '}
           {expired
             ? `expired ${formatDate(expires_at)}. Reconnect to restore access.`
             : `expires ${formatDate(expires_at)} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left).`}
         </Alert>
       )}
+
+      {budget && <BudgetRow budget={budget} />}
 
       <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }} useFlexGap>
         {canReconnect && (
@@ -404,11 +486,12 @@ function ListenerSection({ listener, onReload }: ListenerSectionProps) {
         Listener
       </Typography>
 
+      <ListenerHealthRow listener={listener} />
+
       {present ? (
         <Stack spacing={1} sx={{ mb: 2 }}>
           <Typography variant="body2" data-testid="spotify-listener-stored">
-            Credential stored
-            {listener.state ? ` · ${formatListenerState(listener.state)}` : ''}
+            Credential stored.
           </Typography>
           {!replacing && (
             <Stack direction="row" spacing={1}>
@@ -522,9 +605,55 @@ function ListenerSection({ listener, onReload }: ListenerSectionProps) {
   );
 }
 
-/** Human-readable label for a listener state tag, e.g. `never_run` → "never run". */
+/**
+ * Human-readable label for a listener state tag. Known tags use the LISTENER_STATE_LABEL
+ * table; anything else (an API build that added a tag we do not know yet) falls back to
+ * the raw underscored tag with spaces so the row still renders instead of crashing.
+ */
 function formatListenerState(state: string): string {
-  return state.replace(/_/g, ' ');
+  return LISTENER_STATE_LABEL[state] ?? state.replace(/_/g, ' ');
+}
+
+interface ListenerHealthRowProps {
+  listener: SpotifyListener;
+}
+
+/**
+ * Health readout for the event-driven listener (task 125). Renders the current
+ * listener state as a human label, the last event as a relative time, and the
+ * last error kind when one is present. `credential_dead` is escalated to a
+ * warning Alert that points the admin at the cookie replacement control below,
+ * since that is the only remediation for a rejected sp_dc cookie.
+ */
+function ListenerHealthRow({ listener }: ListenerHealthRowProps) {
+  const rawState = listener.state ?? 'unknown';
+  const label = formatListenerState(rawState);
+  const lastEvent = listener.last_event_at ?? null;
+  const errorKind = listener.error_kind ?? null;
+
+  if (rawState === 'credential_dead') {
+    return (
+      <Alert severity="warning" sx={{ mb: 2 }} data-testid="spotify-listener-health">
+        Session cookie expired, replace it below.
+        {lastEvent ? ` Last event ${formatRelative(lastEvent)}.` : ''}
+        {errorKind ? ` Error: ${errorKind}.` : ''}
+      </Alert>
+    );
+  }
+
+  return (
+    <Stack spacing={0.5} sx={{ mb: 2 }} data-testid="spotify-listener-health">
+      <Typography variant="body2" color="text.secondary">
+        State: {label}
+        {lastEvent ? ` · last event ${formatRelative(lastEvent)}` : ''}
+      </Typography>
+      {errorKind && (
+        <Typography variant="caption" color="error" data-testid="spotify-listener-error-kind">
+          Error: {errorKind}
+        </Typography>
+      )}
+    </Stack>
+  );
 }
 
 /** State-specific detail line — the human-readable read of `state` + timestamps. */

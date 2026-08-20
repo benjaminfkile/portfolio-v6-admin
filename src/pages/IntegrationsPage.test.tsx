@@ -511,7 +511,7 @@ describe('IntegrationsPage, Spotify listener (task 124)', () => {
     expect(screen.queryByRole('button', { name: /^replace$/i })).not.toBeInTheDocument();
   });
 
-  it('present mode: stored row with state label, Replace and Remove actions, no input by default', async () => {
+  it('present mode: stored row, listener health row, Replace and Remove actions, no input by default', async () => {
     vi.mocked(api.getIntegrations).mockResolvedValue(
       list({
         spotify: {
@@ -523,7 +523,8 @@ describe('IntegrationsPage, Spotify listener (task 124)', () => {
 
     const stored = await screen.findByTestId('spotify-listener-stored');
     expect(stored).toHaveTextContent(/credential stored/i);
-    expect(stored).toHaveTextContent(/connected/i);
+    // The state label is rendered on the listener health row (task 125), not here.
+    expect(screen.getByTestId('spotify-listener-health')).toHaveTextContent(/connected/i);
 
     expect(screen.getByRole('button', { name: /^replace$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^remove$/i })).toBeInTheDocument();
@@ -705,5 +706,221 @@ describe('IntegrationsPage, Spotify listener (task 124)', () => {
 
     resolveSave();
     await waitFor(() => expect(api.saveSpotifyListener).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('IntegrationsPage, Spotify source badge (task 125)', () => {
+  it('renders "Live (listener)" in success color when source is listener', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({ spotify: { source: 'listener' } }),
+    );
+    renderPage();
+    const badge = await screen.findByTestId('spotify-source-badge');
+    expect(badge).toHaveTextContent(/live \(listener\)/i);
+    expect(badge.className).toMatch(/colorSuccess/);
+  });
+
+  it('renders "Polling (fallback)" in warning color when source is polling', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({ spotify: { source: 'polling' } }),
+    );
+    renderPage();
+    const badge = await screen.findByTestId('spotify-source-badge');
+    expect(badge).toHaveTextContent(/polling \(fallback\)/i);
+    expect(badge.className).toMatch(/colorWarning/);
+  });
+
+  it('renders "Offline" in neutral color when source is none', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({ spotify: { source: 'none' } }),
+    );
+    renderPage();
+    const badge = await screen.findByTestId('spotify-source-badge');
+    expect(badge).toHaveTextContent(/^offline$/i);
+    expect(badge.className).not.toMatch(/colorSuccess|colorWarning|colorError/);
+  });
+
+  it('hides the source badge when the field is absent (older API build)', async () => {
+    // Baseline `spotify` fixture already omits `source`.
+    renderPage();
+    await screen.findByTestId('spotify-status-chip');
+    expect(screen.queryByTestId('spotify-source-badge')).not.toBeInTheDocument();
+  });
+
+  it('hides the source badge when the value is one this build does not know', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({ spotify: { source: 'martian' as never } }),
+    );
+    renderPage();
+    await screen.findByTestId('spotify-status-chip');
+    expect(screen.queryByTestId('spotify-source-badge')).not.toBeInTheDocument();
+  });
+});
+
+describe('IntegrationsPage, Spotify listener health row (task 125)', () => {
+  it('renders state as a human label plus a relative last-event time', async () => {
+    vi.useFakeTimers({ now: new Date('2026-09-01T00:00:00Z'), shouldAdvanceTime: true });
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          listener: {
+            credential_present: true,
+            state: 'connected',
+            last_event_at: '2026-08-31T23:57:00Z',
+          },
+        },
+      }),
+    );
+    renderPage();
+    const health = await screen.findByTestId('spotify-listener-health');
+    expect(health).toHaveTextContent(/state: connected/i);
+    expect(health).toHaveTextContent(/last event .* minutes? ago/i);
+  });
+
+  it('surfaces error_kind on the health row when present', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          listener: {
+            credential_present: true,
+            state: 'backoff',
+            error_kind: 'ws_reset',
+          },
+        },
+      }),
+    );
+    renderPage();
+    const health = await screen.findByTestId('spotify-listener-health');
+    expect(health).toHaveTextContent(/backing off/i);
+    expect(screen.getByTestId('spotify-listener-error-kind')).toHaveTextContent(/ws_reset/);
+  });
+
+  it('credential_dead surfaces the "replace it below" call to action next to the cookie control', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          listener: { credential_present: true, state: 'credential_dead' },
+        },
+      }),
+    );
+    renderPage();
+    const health = await screen.findByTestId('spotify-listener-health');
+    expect(health).toHaveTextContent(/session cookie expired, replace it below/i);
+    expect(health.className).toMatch(/MuiAlert-standardWarning|colorWarning/);
+    // Replace is still available so the admin can act on the call to action.
+    expect(screen.getByRole('button', { name: /^replace$/i })).toBeInTheDocument();
+  });
+
+  it('degrades gracefully when state is an unknown tag from a newer API', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          listener: {
+            credential_present: true,
+            state: 'quantum_flux' as never,
+          },
+        },
+      }),
+    );
+    renderPage();
+    // Must render, not crash the page.
+    const health = await screen.findByTestId('spotify-listener-health');
+    expect(health).toHaveTextContent(/state: quantum flux/i);
+  });
+
+  it('renders health row without last-event and without error when both are missing', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          listener: { credential_present: false, state: 'no_credential' },
+        },
+      }),
+    );
+    renderPage();
+    const health = await screen.findByTestId('spotify-listener-health');
+    expect(health).toHaveTextContent(/state: no credential/i);
+    expect(health).not.toHaveTextContent(/last event/i);
+    expect(screen.queryByTestId('spotify-listener-error-kind')).not.toBeInTheDocument();
+  });
+});
+
+describe('IntegrationsPage, Spotify budget row (task 125)', () => {
+  it('renders "N of M daily API calls used, resets at <time>" as a quiet row below the threshold', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          budget: { used: 200, cap: 1000, resets_at: '2026-09-01T00:00:00Z' },
+        },
+      }),
+    );
+    renderPage();
+    const row = await screen.findByTestId('spotify-budget');
+    expect(row).toHaveTextContent(/200 of 1000 daily API calls used, resets at/i);
+    // Warning class must NOT be applied below the threshold.
+    expect(row.className).not.toMatch(/MuiAlert-standardWarning/);
+  });
+
+  it('escalates to a warning treatment above 80 percent', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          budget: { used: 810, cap: 1000, resets_at: '2026-09-01T00:00:00Z' },
+        },
+      }),
+    );
+    renderPage();
+    const row = await screen.findByTestId('spotify-budget');
+    expect(row).toHaveTextContent(/810 of 1000 daily API calls used, resets at/i);
+    expect(row.className).toMatch(/MuiAlert-standardWarning|colorWarning/);
+  });
+
+  it('stays quiet exactly at the 80 percent boundary (strictly above triggers the warning)', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          budget: { used: 800, cap: 1000, resets_at: '2026-09-01T00:00:00Z' },
+        },
+      }),
+    );
+    renderPage();
+    const row = await screen.findByTestId('spotify-budget');
+    expect(row.className).not.toMatch(/MuiAlert-standardWarning/);
+  });
+
+  it('hides the budget row when the field is null or absent', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({ spotify: { budget: null } }),
+    );
+    renderPage();
+    await screen.findByTestId('spotify-status-chip');
+    expect(screen.queryByTestId('spotify-budget')).not.toBeInTheDocument();
+  });
+});
+
+describe('IntegrationsPage, Spotify card tolerates missing or unknown fields (task 125)', () => {
+  it('does not crash when the whole listener block is missing', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({ spotify: { listener: undefined } }),
+    );
+    renderPage();
+    // Status chip still renders; no listener section is drawn at all.
+    await screen.findByTestId('spotify-status-chip');
+    expect(screen.queryByTestId('spotify-listener')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('spotify-listener-health')).not.toBeInTheDocument();
+  });
+
+  it('does not crash when source, listener and budget are all missing at once', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: { source: undefined, listener: undefined, budget: null },
+      }),
+    );
+    renderPage();
+    await screen.findByTestId('spotify-status-chip');
+    expect(screen.queryByTestId('spotify-source-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('spotify-budget')).not.toBeInTheDocument();
+    // Pre-existing controls still work.
+    expect(screen.getByRole('button', { name: /reconnect spotify/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^disconnect$/i })).toBeInTheDocument();
   });
 });
