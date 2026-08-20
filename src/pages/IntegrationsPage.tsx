@@ -21,14 +21,12 @@
  * branches beyond kind rendering and the Spotify oauth specifics. Themed via MUI only (§14.4).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
-  Divider,
   Paper,
   Snackbar,
   Stack,
@@ -39,15 +37,10 @@ import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import PersonIcon from '@mui/icons-material/Person';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
-import BlockIcon from '@mui/icons-material/Block';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import {
-  connectIntegration,
-  disableSpotify,
   disconnectIntegration,
-  disconnectSpotify,
-  enableSpotify,
   getIntegrations,
+  getSpotifyStatus,
   removeSpotifyListener,
   saveIntegrationValue,
   saveSpotifyListener,
@@ -55,25 +48,13 @@ import {
 import type {
   CredentialIntegration,
   Integration,
-  SpotifyBudget,
-  SpotifyIntegration,
   SpotifyListener,
-  SpotifyState,
+  SpotifyStatus,
 } from '../api/integrationsApi';
 import { serverMessage } from '../api/serverMessage';
 import { formatDate } from '../lib/media';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ApiKeysSection from '../components/apiKeys/ApiKeysSection';
-
-/** Below this many days remaining, the grant expiry line escalates to a warning (§4.7 overhaul). */
-export const GRANT_EXPIRY_WARNING_DAYS = 14;
-
-/** Fraction of the daily API budget above which the row switches to a warning (task 125). */
-export const BUDGET_WARNING_FRACTION = 0.8;
-
-function daysUntil(iso: string): number {
-  return Math.floor((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-}
 
 /**
  * Coarse "N units ago / from now" — good enough for status detail lines where the
@@ -93,43 +74,22 @@ function formatRelative(iso: string): string {
   return `${days} day${days === 1 ? '' : 's'} ${suffix}`;
 }
 
-/** Short local date+time for `rate_limited_until` — a wall-clock the admin can read. */
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
 /** Helper text under a credential field — keyed by kind, not by integration. */
 const HELPER_TEXT: Record<'api_key' | 'value', string> = {
   api_key: 'Personal access token — public data only (read:user)',
   value: 'Duolingo username (public)',
 };
 
-/** Chip color per Spotify state, per the §4.7 overhaul palette. */
-const STATE_CHIP: Record<SpotifyState, { color: 'default' | 'success' | 'error' | 'warning'; label: string }> = {
-  connected: { color: 'success', label: 'Connected' },
-  auth_broken: { color: 'error', label: 'Authorization broken' },
-  rate_limited: { color: 'warning', label: 'Rate limited' },
-  disconnected: { color: 'default', label: 'Not connected' },
-  disabled: { color: 'default', label: 'Disabled' },
-};
-
 /**
- * Source badge (task 125) - which now-playing feed is actually answering right now.
- * `listener` reads green because the event-driven path is the healthy default;
- * `polling` reads amber because it is the degraded fallback; `none` reads neutral
- * because "offline" overlaps with the legitimate disabled/disconnected states.
+ * Source badge — which now-playing source is authoritative right now. Now-playing
+ * is listener-only, so `listener` reads green ("live") and `none` reads neutral
+ * ("offline").
  */
 const SOURCE_BADGE: Record<
-  'listener' | 'polling' | 'none',
-  { color: 'default' | 'success' | 'warning'; label: string }
+  'listener' | 'none',
+  { color: 'default' | 'success'; label: string }
 > = {
   listener: { color: 'success', label: 'Live (listener)' },
-  polling: { color: 'warning', label: 'Polling (fallback)' },
   none: { color: 'default', label: 'Offline' },
 };
 
@@ -144,276 +104,45 @@ const LISTENER_STATE_LABEL: Record<string, string> = {
   unknown: 'Unknown',
 };
 
-interface BudgetRowProps {
-  budget: SpotifyBudget;
-}
-
-/**
- * Renders the daily Spotify Web API budget as either a quiet secondary line or,
- * once usage crosses BUDGET_WARNING_FRACTION, a warning Alert so the admin sees
- * that we are close to Spotify's per-day cap before the runtime starts refusing
- * calls. `cap <= 0` is treated as "no meaningful percentage" and stays quiet.
- */
-function BudgetRow({ budget }: BudgetRowProps) {
-  const { used, cap, resets_at } = budget;
-  const fraction = cap > 0 ? used / cap : 0;
-  const warn = fraction > BUDGET_WARNING_FRACTION;
-  const line = `${used} of ${cap} daily API calls used, resets at ${formatDateTime(resets_at)}`;
-  if (warn) {
-    return (
-      <Alert severity="warning" sx={{ mb: 2 }} data-testid="spotify-budget">
-        {line}
-      </Alert>
-    );
-  }
-  return (
-    <Typography
-      variant="body2"
-      color="text.secondary"
-      sx={{ mb: 2 }}
-      data-testid="spotify-budget"
-    >
-      {line}
-    </Typography>
-  );
-}
-
-interface OAuthCardProps {
-  integration: SpotifyIntegration;
+interface SpotifyCardProps {
+  status: SpotifyStatus;
   onReload: () => Promise<void>;
-  onToast: (message: string) => void;
 }
 
 /**
- * The Spotify card: renders the API's state verbatim, surfaces the underlying
- * grant's 180-day expiry countdown, and exposes Connect/Reconnect + Disconnect +
- * Disable/Enable. Buttons show/enable per state (e.g. Disconnect hidden when the
- * state is already `disconnected` or `disabled`; Reconnect hidden when disabled).
+ * The Spotify card — listener-only. Now-playing is driven entirely by the
+ * connect-listener (a Spotify web session `sp_dc` cookie the admin pastes); the
+ * card shows which source is live and the listener's health, and manages the
+ * cookie credential. There is no polling, no OAuth reconnect, and no kill switch.
  */
-function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
-  const [connecting, setConnecting] = useState(false);
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [confirmDisable, setConfirmDisable] = useState(false);
-  const [toggling, setToggling] = useState(false);
-
-  const {
-    key,
-    name,
-    state,
-    source,
-    last_success_at,
-    last_error,
-    rate_limited_until,
-    authorized_at,
-    expires_at,
-    listener,
-    budget,
-  } = integration;
-
-  // Guard the lookup: an API state this build doesn't know must degrade to a
-  // neutral chip, never crash the whole page (the 2026-08-19 prod white-screen).
-  const chip = STATE_CHIP[state] ?? { color: 'default' as const, label: 'Unknown' };
+function SpotifyCard({ status, onReload }: SpotifyCardProps) {
+  const { source, listener } = status;
   const sourceBadge =
-    source && (source === 'listener' || source === 'polling' || source === 'none')
-      ? SOURCE_BADGE[source]
-      : null;
-  const daysLeft = expires_at ? daysUntil(expires_at) : null;
-  const expired = daysLeft != null && daysLeft < 0;
-  const expiryWarning =
-    daysLeft != null && daysLeft >= 0 && daysLeft < GRANT_EXPIRY_WARNING_DAYS;
-
-  const canReconnect = state !== 'disabled';
-  const canDisconnect = state !== 'disconnected' && state !== 'disabled';
-  const connectLabel = state === 'disconnected' ? `Connect ${name}` : `Reconnect ${name}`;
-
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const returnTo = `${window.location.origin}/integrations`;
-      const authorizeUrl = await connectIntegration(key, returnTo);
-      // Leave the app: the provider's consent page, then back via the API callback.
-      window.location.assign(authorizeUrl);
-    } catch (err) {
-      onToast(serverMessage(err, `Could not start the ${name} connection. Is the API reachable?`));
-      setConnecting(false);
-    }
-  };
-
-  const handleDisconnect = async () => {
-    setDisconnecting(true);
-    try {
-      await disconnectSpotify();
-      setConfirmDisconnect(false);
-      onToast(`${name} was disconnected.`);
-      await onReload();
-    } catch (err) {
-      onToast(serverMessage(err, `Could not disconnect ${name}.`));
-    } finally {
-      setDisconnecting(false);
-    }
-  };
-
-  const handleDisable = async () => {
-    setToggling(true);
-    try {
-      await disableSpotify();
-      setConfirmDisable(false);
-      onToast(`${name} was disabled.`);
-      await onReload();
-    } catch (err) {
-      onToast(serverMessage(err, `Could not disable ${name}.`));
-    } finally {
-      setToggling(false);
-    }
-  };
-
-  const handleEnable = async () => {
-    setToggling(true);
-    try {
-      await enableSpotify();
-      onToast(`${name} was enabled.`);
-      await onReload();
-    } catch (err) {
-      onToast(serverMessage(err, `Could not enable ${name}.`));
-    } finally {
-      setToggling(false);
-    }
-  };
-
-  const stateDetail = renderStateDetail(state, last_success_at, last_error, rate_limited_until);
+    source === 'listener' || source === 'none' ? SOURCE_BADGE[source] : null;
 
   return (
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
         <MusicNoteIcon color="action" />
         <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
-          {name}
+          Spotify
         </Typography>
-        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'flex-end' }} useFlexGap>
-          {sourceBadge && (
-            <Chip
-              size="small"
-              color={sourceBadge.color}
-              label={sourceBadge.label}
-              data-testid={`${key}-source-badge`}
-            />
-          )}
+        {sourceBadge && (
           <Chip
             size="small"
-            color={chip.color}
-            label={chip.label}
-            data-testid={`${key}-status-chip`}
+            color={sourceBadge.color}
+            label={sourceBadge.label}
+            data-testid="spotify-source-badge"
           />
-        </Stack>
+        )}
       </Stack>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Powers the public site&apos;s now-playing section. Reconnect when the authorization
-        expires or breaks; disable to stop the API from calling Spotify at all.
+        Powers the public site&apos;s now-playing section over an event-driven
+        Spotify web session — no polling.
       </Typography>
 
-      <Typography
-        variant="body2"
-        sx={{
-          mb: 2,
-          color: state === 'disabled' ? 'text.disabled' : 'text.primary',
-        }}
-        data-testid={`${key}-state-detail`}
-      >
-        {stateDetail}
-      </Typography>
-
-      {authorized_at && expires_at && (
-        <Alert
-          severity={expired ? 'error' : expiryWarning ? 'warning' : 'info'}
-          sx={{ mb: 2 }}
-          data-testid={`${key}-expiry`}
-        >
-          Authorized {formatDate(authorized_at)} -{' '}
-          {expired
-            ? `expired ${formatDate(expires_at)}. Reconnect to restore access.`
-            : `expires ${formatDate(expires_at)} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left).`}
-        </Alert>
-      )}
-
-      {budget && <BudgetRow budget={budget} />}
-
-      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }} useFlexGap>
-        {canReconnect && (
-          <Button
-            variant="contained"
-            onClick={() => void handleConnect()}
-            disabled={connecting}
-          >
-            {connecting ? `Redirecting to ${name}…` : connectLabel}
-          </Button>
-        )}
-        {canDisconnect && (
-          <Button
-            color="warning"
-            startIcon={<LinkOffIcon />}
-            onClick={() => setConfirmDisconnect(true)}
-            disabled={disconnecting}
-          >
-            Disconnect
-          </Button>
-        )}
-        {state === 'disabled' ? (
-          <Button
-            color="primary"
-            startIcon={<PlayArrowIcon />}
-            onClick={() => void handleEnable()}
-            disabled={toggling}
-          >
-            {toggling ? 'Enabling…' : 'Enable'}
-          </Button>
-        ) : (
-          <Button
-            color="inherit"
-            startIcon={<BlockIcon />}
-            onClick={() => setConfirmDisable(true)}
-            disabled={toggling}
-          >
-            Disable
-          </Button>
-        )}
-      </Stack>
-
-      <ConfirmDialog
-        open={confirmDisconnect}
-        title={`Disconnect ${name}?`}
-        message={
-          `This removes the stored ${name} authorization. The now-playing section will ` +
-          'show nothing playing until you reconnect.'
-        }
-        confirmLabel={disconnecting ? 'Disconnecting…' : 'Disconnect'}
-        onConfirm={() => void handleDisconnect()}
-        onClose={() => {
-          if (!disconnecting) setConfirmDisconnect(false);
-        }}
-      />
-
-      <ConfirmDialog
-        open={confirmDisable}
-        title={`Disable ${name}?`}
-        message={
-          `The API will stop calling ${name} until you re-enable it. The stored ` +
-          'authorization is kept, so Enable brings it back without reconnecting.'
-        }
-        confirmLabel={toggling ? 'Disabling…' : 'Disable'}
-        onConfirm={() => void handleDisable()}
-        onClose={() => {
-          if (!toggling) setConfirmDisable(false);
-        }}
-      />
-
-      {listener && (
-        <>
-          <Divider sx={{ my: 3 }} />
-          <ListenerSection listener={listener} onReload={onReload} />
-        </>
-      )}
+      <ListenerSection listener={listener} onReload={onReload} />
     </Paper>
   );
 }
@@ -656,35 +385,6 @@ function ListenerHealthRow({ listener }: ListenerHealthRowProps) {
   );
 }
 
-/** State-specific detail line — the human-readable read of `state` + timestamps. */
-function renderStateDetail(
-  state: SpotifyState,
-  lastSuccessAt: string | null,
-  lastError: SpotifyIntegration['last_error'],
-  rateLimitedUntil: string | null,
-): string {
-  switch (state) {
-    case 'connected':
-      return lastSuccessAt
-        ? `Last successful fetch ${formatRelative(lastSuccessAt)}.`
-        : 'Connected.';
-    case 'auth_broken':
-      return lastError
-        ? `Authorization broken — reconnect. Last error ${formatRelative(lastError.at)}.`
-        : 'Authorization broken — reconnect.';
-    case 'rate_limited':
-      return rateLimitedUntil
-        ? `Rate limited until ${formatDateTime(rateLimitedUntil)}.`
-        : 'Rate limited.';
-    case 'disconnected':
-      return 'Not connected.';
-    case 'disabled':
-      return 'Disabled by admin.';
-    default:
-      return 'Status unavailable.';
-  }
-}
-
 interface CredentialCardProps {
   integration: CredentialIntegration;
   onReload: () => Promise<void>;
@@ -805,17 +505,21 @@ function CredentialCard({ integration, onReload, onToast }: CredentialCardProps)
 
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [spotify, setSpotify] = useState<SpotifyStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
-
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError('');
     try {
-      setIntegrations(await getIntegrations());
+      const [list, spotifyStatus] = await Promise.all([
+        getIntegrations(),
+        getSpotifyStatus(),
+      ]);
+      setIntegrations(list);
+      setSpotify(spotifyStatus);
     } catch (err) {
       setLoadError(serverMessage(err, 'Could not load the integrations. Is the API reachable?'));
     } finally {
@@ -826,21 +530,6 @@ export default function IntegrationsPage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  // Returning from the OAuth round-trip: the API callback redirected back here with
-  // ?spotify=connected|error. Toast it once, then strip the param.
-  useEffect(() => {
-    const result = searchParams.get('spotify');
-    if (!result) return;
-    setToast(
-      result === 'connected'
-        ? 'Spotify is connected. Now-playing is using the new authorization.'
-        : 'Connecting Spotify failed — check the API logs and try again.',
-    );
-    const next = new URLSearchParams(searchParams);
-    next.delete('spotify');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
 
   if (loading) {
     return (
@@ -857,8 +546,8 @@ export default function IntegrationsPage() {
           Integrations
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          External services the site depends on. OAuth authorizations (like Spotify&apos;s)
-          expire periodically — reconnect here when the expiry approaches; paste API keys and
+          External services the site depends on. Spotify now-playing runs on an
+          event-driven web session (paste the sp_dc cookie); paste API keys and
           public values for the rest.
         </Typography>
       </Box>
@@ -876,23 +565,15 @@ export default function IntegrationsPage() {
         </Alert>
       ) : (
         <Stack spacing={2}>
-          {integrations.map((integration) =>
-            integration.auth_kind === 'oauth' ? (
-              <OAuthCard
-                key={integration.key}
-                integration={integration}
-                onReload={load}
-                onToast={setToast}
-              />
-            ) : (
-              <CredentialCard
-                key={integration.key}
-                integration={integration}
-                onReload={load}
-                onToast={setToast}
-              />
-            ),
-          )}
+          {spotify && <SpotifyCard status={spotify} onReload={load} />}
+          {integrations.map((integration) => (
+            <CredentialCard
+              key={integration.key}
+              integration={integration}
+              onReload={load}
+              onToast={setToast}
+            />
+          ))}
         </Stack>
       )}
 

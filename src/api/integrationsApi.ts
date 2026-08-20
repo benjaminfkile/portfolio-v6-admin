@@ -39,40 +39,13 @@ function unwrap<T>(resp: { data: Envelope<T> }): T {
 /** Which control the card renders — see the module note. */
 export type AuthKind = 'oauth' | 'api_key' | 'value';
 
-export type IntegrationKey = 'spotify' | 'github' | 'duolingo';
+export type IntegrationKey = 'github' | 'duolingo';
 
 /**
- * The five runtime states Spotify can be in. Derived by the API from live probe
- * results (§4.7 overhaul), NOT from the presence of a credential — the previous
- * "any token present = Connected" shortcut lied for days when the token was dead.
- *
- *  - `connected`     — last probe succeeded; now-playing works.
- *  - `auth_broken`   — refresh failed (revoked/expired grant); user must reconnect.
- *  - `rate_limited`  — Spotify is throttling; back off until `rate_limited_until`.
- *  - `disconnected`  — no stored grant.
- *  - `disabled`      — admin flipped the kill switch; API will not call Spotify.
+ * Which now-playing source is authoritative. Now-playing is listener-only, so
+ * this is `listener` when the dealer socket is live and `none` otherwise.
  */
-export type SpotifyState =
-  | 'connected'
-  | 'auth_broken'
-  | 'rate_limited'
-  | 'disconnected'
-  | 'disabled';
-
-/** Structured last-error payload the API attaches to non-`connected` Spotify states. */
-export interface SpotifyLastError {
-  /** Short machine tag, e.g. `refresh_failed`, `rate_limited`, `http_5xx`. */
-  kind: string;
-  /** ISO timestamp of when the error was observed. */
-  at: string;
-}
-
-/**
- * Which now-playing feed is currently answering — the event-driven listener, the
- * polling fallback, or nothing at all. Extended by task 125 alongside the listener
- * health block; older API builds may omit it, so the card treats it as optional.
- */
-export type SpotifySource = 'listener' | 'polling' | 'none';
+export type SpotifySource = 'listener' | 'none';
 
 /**
  * Listener state machine (task 125). `credential_dead` is the "sp_dc cookie has
@@ -107,39 +80,13 @@ export interface SpotifyListener {
 }
 
 /**
- * Spotify's daily API-call budget (task 125). `used`/`cap` are counts of Web API
- * calls the runtime has made against Spotify today; `resets_at` is when the counter
- * rolls over. The card renders a plain read below 80 percent and escalates to a
- * warning treatment above that. Older API builds may omit or null the block; the
- * card hides the row in that case.
+ * The listener-only Spotify status contract (GET /api/admin/spotify/status).
+ * Now-playing is driven entirely by the connect-listener; `source` is
+ * `listener` when it is live, else `none`, and `listener` carries its health.
  */
-export interface SpotifyBudget {
-  used: number;
-  cap: number;
-  resets_at: string;
-}
-
-/**
- * Spotify's integration shape, the state-machine contract from the §4.7 overhaul.
- * `authorized_at`/`expires_at` describe the underlying OAuth grant (Spotify refresh
- * tokens live 180 days); the card renders them as an expiry countdown independent
- * of `state`, since a grant can be present in most states. `listener` carries the
- * separate sp_dc-cookie credential the event-driven now-playing path uses; it is
- * optional so older API builds without the field still deserialize cleanly.
- */
-export interface SpotifyIntegration {
-  key: 'spotify';
-  name: string;
-  auth_kind: 'oauth';
-  state: SpotifyState;
-  last_success_at: string | null;
-  last_error: SpotifyLastError | null;
-  rate_limited_until: string | null;
-  authorized_at: string | null;
-  expires_at: string | null;
-  source?: SpotifySource | string;
-  listener?: SpotifyListener;
-  budget?: SpotifyBudget | null;
+export interface SpotifyStatus {
+  source: SpotifySource;
+  listener: SpotifyListener;
 }
 
 /**
@@ -156,7 +103,7 @@ export interface CredentialIntegration {
   authorized_at: string | null;
 }
 
-export type Integration = SpotifyIntegration | CredentialIntegration;
+export type Integration = CredentialIntegration;
 
 /** GET /api/admin/integrations — every integration with its current state. */
 export async function getIntegrations(): Promise<Integration[]> {
@@ -175,46 +122,19 @@ export async function saveIntegrationValue(key: string, value: string): Promise<
 }
 
 /**
- * POST /api/admin/integrations/:key/connect — oauth kinds only. Mints the state and
- * returns the authorize URL to navigate to; `returnTo` is where the callback sends
- * the browser afterwards (it rides in the server-side state, never in a URL).
- */
-export async function connectIntegration(key: string, returnTo: string): Promise<string> {
-  const data = unwrap<{ authorize_url: string }>(
-    await apiClient.post(`/api/admin/integrations/${key}/connect`, { return_to: returnTo }),
-  );
-  return data.authorize_url;
-}
-
-/**
  * DELETE /api/admin/integrations/:key — drop the admin-stored credential. Used by
- * the GitHub / Duolingo cards; Spotify has its own dedicated disconnect endpoint
- * (see {@link disconnectSpotify}).
+ * the GitHub / Duolingo cards.
  */
 export async function disconnectIntegration(key: string): Promise<void> {
   await apiClient.delete(`/api/admin/integrations/${key}`);
 }
 
 /**
- * POST /api/admin/spotify/disconnect — remove the stored Spotify grant. Leaves the
- * integration in `disconnected` state (unless it was `disabled`, in which case it
- * stays disabled with no grant).
+ * GET /api/admin/spotify/status — the listener-only status contract (which source
+ * is authoritative + the connect-listener's health).
  */
-export async function disconnectSpotify(): Promise<void> {
-  await apiClient.post('/api/admin/spotify/disconnect');
-}
-
-/**
- * POST /api/admin/spotify/disable — kill switch. The API stops calling Spotify
- * until an admin re-enables; the stored grant is left intact.
- */
-export async function disableSpotify(): Promise<void> {
-  await apiClient.post('/api/admin/spotify/disable');
-}
-
-/** POST /api/admin/spotify/enable — clear the kill switch. */
-export async function enableSpotify(): Promise<void> {
-  await apiClient.post('/api/admin/spotify/enable');
+export async function getSpotifyStatus(): Promise<SpotifyStatus> {
+  return unwrap<SpotifyStatus>(await apiClient.get('/api/admin/spotify/status'));
 }
 
 /**
