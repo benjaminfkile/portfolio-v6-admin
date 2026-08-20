@@ -28,6 +28,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Divider,
   Paper,
   Snackbar,
   Stack,
@@ -47,12 +48,15 @@ import {
   disconnectSpotify,
   enableSpotify,
   getIntegrations,
+  removeSpotifyListener,
   saveIntegrationValue,
+  saveSpotifyListener,
 } from '../api/integrationsApi';
 import type {
   CredentialIntegration,
   Integration,
   SpotifyIntegration,
+  SpotifyListener,
   SpotifyState,
 } from '../api/integrationsApi';
 import { serverMessage } from '../api/serverMessage';
@@ -138,6 +142,7 @@ function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
     rate_limited_until,
     authorized_at,
     expires_at,
+    listener,
   } = integration;
 
   // Guard the lookup: an API state this build doesn't know must degrade to a
@@ -320,8 +325,206 @@ function OAuthCard({ integration, onReload, onToast }: OAuthCardProps) {
           if (!toggling) setConfirmDisable(false);
         }}
       />
+
+      {listener && (
+        <>
+          <Divider sx={{ my: 3 }} />
+          <ListenerSection listener={listener} onReload={onReload} />
+        </>
+      )}
     </Paper>
   );
+}
+
+interface ListenerSectionProps {
+  listener: SpotifyListener;
+  onReload: () => Promise<void>;
+}
+
+/**
+ * The event-driven listener credential (task 124/125). The sp_dc cookie is a
+ * Spotify web session credential the API uses for a push-based now-playing feed;
+ * it is write-only end to end (never returned, never logged). Absent mode paints
+ * an explainer + a masked paste field + Connect; present mode paints a stored
+ * row plus Replace and Remove, with Remove confirmed. Errors on either mutation
+ * surface inline right next to the control that raised them, never as toasts,
+ * so the admin can see them without leaving the section.
+ */
+function ListenerSection({ listener, onReload }: ListenerSectionProps) {
+  const present = listener.credential_present;
+  const [replacing, setReplacing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState('');
+
+  const showInput = !present || replacing;
+  const canSubmit = draft.trim().length > 0 && !saving && !removing;
+
+  const handleSave = async () => {
+    const value = draft.trim();
+    if (!value) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      await saveSpotifyListener(value);
+      setDraft('');
+      setReplacing(false);
+      await onReload();
+    } catch (err) {
+      setSaveError(
+        serverMessage(err, 'Could not save the listener credential. Is the API reachable?'),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setRemoving(true);
+    setRemoveError('');
+    try {
+      await removeSpotifyListener();
+      setConfirmRemove(false);
+      setDraft('');
+      setReplacing(false);
+      await onReload();
+    } catch (err) {
+      setRemoveError(serverMessage(err, 'Could not remove the listener credential.'));
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  return (
+    <Box data-testid="spotify-listener">
+      <Typography variant="subtitle1" component="h3" sx={{ mb: 1 }}>
+        Listener
+      </Typography>
+
+      {present ? (
+        <Stack spacing={1} sx={{ mb: 2 }}>
+          <Typography variant="body2" data-testid="spotify-listener-stored">
+            Credential stored
+            {listener.state ? ` · ${formatListenerState(listener.state)}` : ''}
+          </Typography>
+          {!replacing && (
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setSaveError('');
+                  setReplacing(true);
+                }}
+                disabled={removing}
+              >
+                Replace
+              </Button>
+              <Button
+                color="warning"
+                size="small"
+                startIcon={<LinkOffIcon />}
+                onClick={() => {
+                  setRemoveError('');
+                  setConfirmRemove(true);
+                }}
+                disabled={removing}
+              >
+                Remove
+              </Button>
+            </Stack>
+          )}
+          {removeError && (
+            <Alert severity="error" data-testid="spotify-listener-remove-error">
+              {removeError}
+            </Alert>
+          )}
+        </Stack>
+      ) : (
+        <Stack spacing={1} sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Event-driven now-playing via your Spotify web session. Paste the sp_dc cookie from
+            open.spotify.com.
+          </Typography>
+          <Typography variant="caption" color="text.secondary" component="div">
+            How to find it: open.spotify.com while logged in, DevTools, Application, Cookies,
+            copy sp_dc.
+          </Typography>
+        </Stack>
+      )}
+
+      {showInput && (
+        <Stack spacing={1}>
+          <TextField
+            type="password"
+            size="small"
+            fullWidth
+            label="sp_dc cookie"
+            placeholder="••••••••"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={saving || removing}
+            slotProps={{
+              htmlInput: {
+                'data-testid': 'spotify-listener-input',
+                autoComplete: 'off',
+                spellCheck: false,
+                'aria-label': 'sp_dc cookie',
+              },
+            }}
+          />
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              onClick={() => void handleSave()}
+              disabled={!canSubmit}
+            >
+              {saving ? 'Saving…' : present ? 'Save' : 'Connect'}
+            </Button>
+            {replacing && (
+              <Button
+                onClick={() => {
+                  setReplacing(false);
+                  setDraft('');
+                  setSaveError('');
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+            )}
+          </Stack>
+          {saveError && (
+            <Alert severity="error" data-testid="spotify-listener-save-error">
+              {saveError}
+            </Alert>
+          )}
+        </Stack>
+      )}
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove listener credential?"
+        message={
+          'This deletes the stored sp_dc cookie. The event-driven now-playing feed will ' +
+          'stop until you paste a new one.'
+        }
+        confirmLabel={removing ? 'Removing…' : 'Remove'}
+        onConfirm={() => void handleRemove()}
+        onClose={() => {
+          if (!removing) setConfirmRemove(false);
+        }}
+      />
+    </Box>
+  );
+}
+
+/** Human-readable label for a listener state tag, e.g. `never_run` → "never run". */
+function formatListenerState(state: string): string {
+  return state.replace(/_/g, ' ');
 }
 
 /** State-specific detail line — the human-readable read of `state` + timestamps. */

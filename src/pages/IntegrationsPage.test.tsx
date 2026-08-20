@@ -18,6 +18,8 @@ vi.mock('../api/integrationsApi', () => ({
   disconnectSpotify: vi.fn(),
   disableSpotify: vi.fn(),
   enableSpotify: vi.fn(),
+  saveSpotifyListener: vi.fn(),
+  removeSpotifyListener: vi.fn(),
 }));
 
 // The API-keys section fetches on mount; mock its API so the page test stays hermetic.
@@ -37,6 +39,7 @@ const spotify: SpotifyIntegration = {
   rate_limited_until: null,
   authorized_at: '2026-08-01T00:00:00Z',
   expires_at: '2027-01-28T00:00:00Z',
+  listener: { credential_present: false, state: 'never_run' },
 };
 
 const github: CredentialIntegration = {
@@ -89,6 +92,8 @@ beforeEach(() => {
   vi.mocked(api.disconnectSpotify).mockResolvedValue();
   vi.mocked(api.disableSpotify).mockResolvedValue();
   vi.mocked(api.enableSpotify).mockResolvedValue();
+  vi.mocked(api.saveSpotifyListener).mockResolvedValue();
+  vi.mocked(api.removeSpotifyListener).mockResolvedValue();
 });
 
 afterEach(() => {
@@ -480,5 +485,225 @@ describe('IntegrationsPage — value card (Duolingo)', () => {
       expect(api.saveIntegrationValue).toHaveBeenCalledWith('duolingo', 'my_handle'),
     );
     expect(api.getIntegrations).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('IntegrationsPage, Spotify listener (task 124)', () => {
+  it('absent mode: explainer, step hint, masked input, no stored row', async () => {
+    renderPage();
+    await screen.findByTestId('spotify-listener');
+
+    expect(
+      screen.getByText(/event-driven now-playing via your spotify web session/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/open\.spotify\.com while logged in, devtools, application, cookies/i),
+    ).toBeInTheDocument();
+
+    const input = screen.getByTestId('spotify-listener-input') as HTMLInputElement;
+    expect(input.type).toBe('password');
+    expect(input.value).toBe('');
+
+    expect(screen.queryByTestId('spotify-listener-stored')).not.toBeInTheDocument();
+    // Connect is the primary in absent mode.
+    expect(screen.getByRole('button', { name: /^connect$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^replace$/i })).not.toBeInTheDocument();
+  });
+
+  it('present mode: stored row with state label, Replace and Remove actions, no input by default', async () => {
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({
+        spotify: {
+          listener: { credential_present: true, state: 'connected' },
+        },
+      }),
+    );
+    renderPage();
+
+    const stored = await screen.findByTestId('spotify-listener-stored');
+    expect(stored).toHaveTextContent(/credential stored/i);
+    expect(stored).toHaveTextContent(/connected/i);
+
+    expect(screen.getByRole('button', { name: /^replace$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^remove$/i })).toBeInTheDocument();
+    // The input is hidden until Replace is clicked.
+    expect(screen.queryByTestId('spotify-listener-input')).not.toBeInTheDocument();
+  });
+
+  it('Connect PUTs the sp_dc cookie, refetches, and never echoes the value back', async () => {
+    const user = userEvent.setup();
+    let currentList = list();
+    vi.mocked(api.getIntegrations).mockImplementation(async () => currentList);
+    vi.mocked(api.saveSpotifyListener).mockImplementation(async () => {
+      currentList = list({
+        spotify: { listener: { credential_present: true, state: 'connected' } },
+      });
+    });
+    renderPage();
+
+    const input = await screen.findByTestId('spotify-listener-input');
+    await user.type(input, 'AQC-secret-dc-cookie');
+    await user.click(screen.getByRole('button', { name: /^connect$/i }));
+
+    await waitFor(() =>
+      expect(api.saveSpotifyListener).toHaveBeenCalledWith('AQC-secret-dc-cookie'),
+    );
+    // Refetch happened after save.
+    await waitFor(() => expect(api.getIntegrations).toHaveBeenCalledTimes(2));
+
+    // Post-save, we're in the stored/present mode: no value is displayed and the
+    // draft input is gone (so the pasted secret is nowhere in the DOM).
+    const stored = await screen.findByTestId('spotify-listener-stored');
+    expect(stored).toBeInTheDocument();
+    expect(screen.queryByTestId('spotify-listener-input')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('AQC-secret-dc-cookie');
+  });
+
+  it('Replace reveals a fresh masked input, saves via PUT, and clears the draft after', async () => {
+    const user = userEvent.setup();
+    let currentList = list({
+      spotify: { listener: { credential_present: true, state: 'connected' } },
+    });
+    vi.mocked(api.getIntegrations).mockImplementation(async () => currentList);
+    vi.mocked(api.saveSpotifyListener).mockImplementation(async () => {
+      currentList = list({
+        spotify: { listener: { credential_present: true, state: 'connected' } },
+      });
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /^replace$/i }));
+    const listener = screen.getByTestId('spotify-listener');
+    const input = within(listener).getByTestId('spotify-listener-input') as HTMLInputElement;
+    expect(input.type).toBe('password');
+    expect(input.value).toBe('');
+
+    await user.type(input, 'new-dc-value');
+    await user.click(within(listener).getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(api.saveSpotifyListener).toHaveBeenCalledWith('new-dc-value'),
+    );
+    await waitFor(() => expect(api.getIntegrations).toHaveBeenCalledTimes(2));
+
+    // Input is dismissed and the value has been dropped from React state.
+    await waitFor(() =>
+      expect(screen.queryByTestId('spotify-listener-input')).not.toBeInTheDocument(),
+    );
+    expect(document.body.textContent).not.toContain('new-dc-value');
+  });
+
+  it('Remove requires confirmation, then DELETEs and refetches', async () => {
+    const user = userEvent.setup();
+    let currentList = list({
+      spotify: { listener: { credential_present: true, state: 'connected' } },
+    });
+    vi.mocked(api.getIntegrations).mockImplementation(async () => currentList);
+    vi.mocked(api.removeSpotifyListener).mockImplementation(async () => {
+      currentList = list({
+        spotify: { listener: { credential_present: false, state: 'never_run' } },
+      });
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /^remove$/i }));
+
+    // Confirm dialog is up, DELETE has not run yet.
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(/deletes the stored sp_dc cookie/i),
+    ).toBeInTheDocument();
+    expect(api.removeSpotifyListener).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: /^remove$/i }));
+    await waitFor(() => expect(api.removeSpotifyListener).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.getIntegrations).toHaveBeenCalledTimes(2));
+
+    // After remove, the card is back to absent mode.
+    await screen.findByRole('button', { name: /^connect$/i });
+    expect(screen.queryByTestId('spotify-listener-stored')).not.toBeInTheDocument();
+  });
+
+  it('surfaces PUT errors inline via serverMessage, never as an unhandled rejection', async () => {
+    const { default: axios } = await import('axios');
+    const err = new axios.AxiosError('Request failed');
+    err.response = {
+      data: { error: true, errorMsg: 'sp_dc cookie was rejected by Spotify' },
+      status: 400,
+      statusText: 'Bad Request',
+      headers: {},
+      config: {} as never,
+    };
+    vi.mocked(api.saveSpotifyListener).mockRejectedValue(err);
+
+    const unhandled = vi.fn();
+    window.addEventListener('unhandledrejection', unhandled);
+    try {
+      const user = userEvent.setup();
+      renderPage();
+      await user.type(
+        await screen.findByTestId('spotify-listener-input'),
+        'bad-value',
+      );
+      await user.click(screen.getByRole('button', { name: /^connect$/i }));
+
+      const alert = await screen.findByTestId('spotify-listener-save-error');
+      expect(alert).toHaveTextContent(/sp_dc cookie was rejected by spotify/i);
+    } finally {
+      window.removeEventListener('unhandledrejection', unhandled);
+    }
+    expect(unhandled).not.toHaveBeenCalled();
+  });
+
+  it('surfaces DELETE errors inline on the stored row', async () => {
+    const { default: axios } = await import('axios');
+    const err = new axios.AxiosError('Request failed');
+    err.response = {
+      data: { error: true, errorMsg: 'listener credential could not be removed' },
+      status: 500,
+      statusText: 'Internal Server Error',
+      headers: {},
+      config: {} as never,
+    };
+    vi.mocked(api.getIntegrations).mockResolvedValue(
+      list({ spotify: { listener: { credential_present: true, state: 'connected' } } }),
+    );
+    vi.mocked(api.removeSpotifyListener).mockRejectedValue(err);
+
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: /^remove$/i }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: /^remove$/i }),
+    );
+
+    const alert = await screen.findByTestId('spotify-listener-remove-error');
+    expect(alert).toHaveTextContent(/listener credential could not be removed/i);
+  });
+
+  it('Connect is disabled until the paste field has content, and shows Saving… while in flight', async () => {
+    let resolveSave: () => void = () => {};
+    vi.mocked(api.saveSpotifyListener).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    const connect = await screen.findByRole('button', { name: /^connect$/i });
+    expect(connect).toBeDisabled();
+
+    await user.type(await screen.findByTestId('spotify-listener-input'), 'x');
+    expect(connect).not.toBeDisabled();
+
+    await user.click(connect);
+    // While the PUT is in flight, the button reads Saving… and is disabled.
+    expect(await screen.findByRole('button', { name: /saving/i })).toBeDisabled();
+
+    resolveSave();
+    await waitFor(() => expect(api.saveSpotifyListener).toHaveBeenCalledTimes(1));
   });
 });
