@@ -68,15 +68,55 @@ export interface SpotifyLastError {
 }
 
 /**
+ * Which now-playing feed is currently answering — the event-driven listener, the
+ * polling fallback, or nothing at all. Extended by task 125 alongside the listener
+ * health block; older API builds may omit it, so the card treats it as optional.
+ */
+export type SpotifySource = 'listener' | 'polling' | 'none';
+
+/**
+ * Listener state machine (task 125). `credential_dead` is the "sp_dc cookie has
+ * been rejected by Spotify" state, which the card surfaces as a call to action
+ * pointing at the cookie replacement control. The union is open on purpose: an
+ * API build that returns a tag this client does not yet know must degrade to a
+ * neutral label rather than crash.
+ */
+export type SpotifyListenerState =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
+  | 'backoff'
+  | 'credential_dead'
+  | 'no_credential'
+  | 'unknown';
+
+/**
  * The event-driven "listener" side of the Spotify integration (task 124/125). It is
  * driven by a Spotify web session cookie (`sp_dc`) the admin pastes; the API stores
- * it write-only and never echoes it back, so the card mode is driven by
- * `credential_present` alone. `state` is a short machine tag the card renders as-is
- * (task 125 will refine into a full health readout).
+ * it write-only and never echoes it back. Task 125 extends the block with a full
+ * health readout: `state` reports the listener's runtime health, `last_event_at`
+ * is the last event the listener received, and `error_kind` is a short machine tag
+ * describing the last failure when there is one. All health fields are optional so
+ * an older API build without them still deserializes cleanly.
  */
 export interface SpotifyListener {
   credential_present: boolean;
-  state?: string;
+  state?: SpotifyListenerState | string;
+  last_event_at?: string | null;
+  error_kind?: string | null;
+}
+
+/**
+ * Spotify's daily API-call budget (task 125). `used`/`cap` are counts of Web API
+ * calls the runtime has made against Spotify today; `resets_at` is when the counter
+ * rolls over. The card renders a plain read below 80 percent and escalates to a
+ * warning treatment above that. Older API builds may omit or null the block; the
+ * card hides the row in that case.
+ */
+export interface SpotifyBudget {
+  used: number;
+  cap: number;
+  resets_at: string;
 }
 
 /**
@@ -97,7 +137,9 @@ export interface SpotifyIntegration {
   rate_limited_until: string | null;
   authorized_at: string | null;
   expires_at: string | null;
+  source?: SpotifySource | string;
   listener?: SpotifyListener;
+  budget?: SpotifyBudget | null;
 }
 
 /**
