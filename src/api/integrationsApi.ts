@@ -68,10 +68,24 @@ export interface SpotifyLastError {
 }
 
 /**
- * Spotify's integration shape — the state-machine contract from the §4.7 overhaul.
+ * The event-driven "listener" side of the Spotify integration (task 124/125). It is
+ * driven by a Spotify web session cookie (`sp_dc`) the admin pastes; the API stores
+ * it write-only and never echoes it back, so the card mode is driven by
+ * `credential_present` alone. `state` is a short machine tag the card renders as-is
+ * (task 125 will refine into a full health readout).
+ */
+export interface SpotifyListener {
+  credential_present: boolean;
+  state?: string;
+}
+
+/**
+ * Spotify's integration shape, the state-machine contract from the §4.7 overhaul.
  * `authorized_at`/`expires_at` describe the underlying OAuth grant (Spotify refresh
  * tokens live 180 days); the card renders them as an expiry countdown independent
- * of `state`, since a grant can be present in most states.
+ * of `state`, since a grant can be present in most states. `listener` carries the
+ * separate sp_dc-cookie credential the event-driven now-playing path uses; it is
+ * optional so older API builds without the field still deserialize cleanly.
  */
 export interface SpotifyIntegration {
   key: 'spotify';
@@ -83,6 +97,7 @@ export interface SpotifyIntegration {
   rate_limited_until: string | null;
   authorized_at: string | null;
   expires_at: string | null;
+  listener?: SpotifyListener;
 }
 
 /**
@@ -158,4 +173,22 @@ export async function disableSpotify(): Promise<void> {
 /** POST /api/admin/spotify/enable — clear the kill switch. */
 export async function enableSpotify(): Promise<void> {
   await apiClient.post('/api/admin/spotify/enable');
+}
+
+/**
+ * PUT /api/admin/integrations/spotify/listener, store the admin's Spotify web
+ * session cookie (`sp_dc`) as the credential the event-driven listener uses. The
+ * value is write-only, the API never echoes it back, and callers should not log it.
+ * Returns 204, callers refetch status to reflect the save.
+ */
+export async function saveSpotifyListener(spDc: string): Promise<void> {
+  await apiClient.put('/api/admin/integrations/spotify/listener', { sp_dc: spDc });
+}
+
+/**
+ * DELETE /api/admin/integrations/spotify/listener, remove the stored listener
+ * credential. The listener stops until a new `sp_dc` is saved.
+ */
+export async function removeSpotifyListener(): Promise<void> {
+  await apiClient.delete('/api/admin/integrations/spotify/listener');
 }
