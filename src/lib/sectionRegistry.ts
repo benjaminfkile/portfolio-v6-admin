@@ -24,7 +24,8 @@ export type FieldKind =
   | 'links'
   | 'skillRefs'
   | 'postRefs'
-  | 'stringList';
+  | 'stringList'
+  | 'hero_background';
 
 export interface FieldDef {
   key: string;
@@ -95,6 +96,15 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       { key: 'title', label: 'Title', kind: 'text' },
       { key: 'tagline', label: 'Tagline', kind: 'text' },
       { key: 'background_media_id', label: 'Background media', kind: 'media' },
+      {
+        key: 'background',
+        label: 'Background image',
+        kind: 'hero_background',
+        helperText:
+          'Tune how the background image sits behind the hero. Only visible once a ' +
+          'background media item is picked. Values left at their defaults are omitted ' +
+          'from the saved payload.',
+      },
     ],
     defaultData: {},
   },

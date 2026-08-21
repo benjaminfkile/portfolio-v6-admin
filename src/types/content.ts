@@ -50,11 +50,47 @@ export type SectionType =
 
 /* -- Section `data` shapes ---------------------------------------------------------- */
 
-/** hero — static section: title, tagline, optional background media (§3.4, §3.8). */
+/**
+ * hero background tweaks (task #131). All keys optional; the site renders the documented
+ * defaults when a key is absent, so an existing hero with only `background_media_id`
+ * keeps looking as it does today (0.1 dark alpha was the original hard-coded value; light
+ * currently renders the token 0.06). Values are numbers (not strings); the admin editor
+ * omits keys left at their defaults so the stored JSON stays minimal.
+ *
+ *  opacity_dark    (0..1, default 0.1)  image alpha on the dark theme
+ *  opacity_light   (0..1, default 0.06) image alpha on the light theme
+ *  object_fit      css object-fit, default 'cover'
+ *  object_position free-text css object-position, default '50% 50%'
+ *  blur_px         (0..40, default 0)   css filter blur
+ *  grayscale       (0..1,  default 0)   css filter grayscale
+ *  brightness      (0..2,  default 1)   css filter brightness
+ *  contrast        (0..2,  default 1)   css filter contrast
+ *  saturate        (0..2,  default 1)   css filter saturate
+ *  scale           (1..2,  default 1)   transform: scale(); hides soft edges of a blur
+ *  overlay_dark    (0..1,  default 0)   alpha of a --ground overlay on the dark theme
+ *  overlay_light   (0..1,  default 0)   alpha of a --ground overlay on the light theme
+ */
+export interface HeroBackground {
+  opacity_dark?: number;
+  opacity_light?: number;
+  object_fit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
+  object_position?: string;
+  blur_px?: number;
+  grayscale?: number;
+  brightness?: number;
+  contrast?: number;
+  saturate?: number;
+  scale?: number;
+  overlay_dark?: number;
+  overlay_light?: number;
+}
+
+/** hero (§3.4, §3.8): title, tagline, optional background media, optional background tweaks. */
 export interface HeroData {
   title: string;
   tagline?: string;
   background_media_id?: string;
+  background?: HeroBackground;
 }
 
 /** about — static prose section (no items). */
