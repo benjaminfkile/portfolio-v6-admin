@@ -25,6 +25,12 @@ export interface PostMetadataValue {
   cover_media_id: string | null;
   /** The blog this post is assigned to, or null = unassigned (Blogs v1.13). */
   blog_id: string | null;
+  /**
+   * ISO 8601 UTC display date shown on the post (task #134), or null to defer the stamp
+   * until first publish. The editor exposes this as a local date + time control and
+   * writes back the ISO UTC equivalent; republish preserves whatever is stored here.
+   */
+  published_at: string | null;
 }
 
 interface PostMetadataEditorProps {
@@ -40,6 +46,34 @@ const SLUG_LOCK_TOOLTIP =
 
 /** Sentinel value for the "No blog" option — MUI selects cannot hold a real `null`. */
 const NO_BLOG = '';
+
+/**
+ * Format an ISO UTC timestamp for a `<input type="datetime-local">` in the browser's
+ * local timezone (task #134). Returns an empty string when the value is null or invalid,
+ * so the input renders empty and the "stamp at first publish" affordance stays available.
+ */
+export function isoToDatetimeLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+/**
+ * Convert a `datetime-local` input value (interpreted in the browser's local timezone)
+ * to an ISO 8601 UTC string. An empty input becomes null so the API records
+ * "stamp at first publish" (task #134).
+ */
+export function datetimeLocalInputToIso(local: string): string | null {
+  if (!local) return null;
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
 
 export default function PostMetadataEditor({
   value,
@@ -146,6 +180,20 @@ export default function PostMetadataEditor({
         value={value.excerpt}
         onChange={(e) => set('excerpt', e.target.value)}
         helperText="Short summary shown in blog teasers."
+      />
+
+      <TextField
+        label="Published on"
+        type="datetime-local"
+        fullWidth
+        size="small"
+        value={isoToDatetimeLocalInput(value.published_at)}
+        onChange={(e) => set('published_at', datetimeLocalInputToIso(e.target.value))}
+        helperText="Leave empty to use the publish time. Republishing keeps this date."
+        slotProps={{
+          inputLabel: { shrink: true },
+          htmlInput: { 'data-testid': 'published-at-input' },
+        }}
       />
 
       <TagsInput value={value.tags} onChange={(tags) => set('tags', tags)} />

@@ -75,6 +75,12 @@ export interface UpdatePostPayload {
   cover_media_id?: string | null;
   /** The blog this post is assigned to; null unassigns it (Blogs v1.13). */
   blog_id?: string | null;
+  /**
+   * ISO 8601 UTC display date, or null to defer the stamp until first publish (task #134).
+   * A published post that sends null keeps whatever the server currently holds; the admin
+   * editor always sends the current field value so republish preserves it.
+   */
+  published_at?: string | null;
   draft_body?: Block[];
   expected_updated_at: string;
 }
