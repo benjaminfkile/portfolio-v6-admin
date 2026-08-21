@@ -1,17 +1,41 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SectionEditDialog from './SectionEditDialog';
 import ItemEditDialog from './ItemEditDialog';
 import { SECTION_TYPE_LIST, getSectionTypeDef } from '../../lib/sectionRegistry';
+import { HERO_BACKGROUND_DEFAULTS } from '../../components/forms/HeroBackgroundField';
 import type { AdminSection } from '../../types/admin';
-import type { SectionType } from '../../types/content';
+import type { HeroBackground, SectionType } from '../../types/content';
 
 // The blog section renders a BlogSlugField, which fetches the blog list on mount.
 // Stub the module so the dialog opens without an HTTP call.
 vi.mock('../../api/blogsApi', () => ({
   getBlogs: vi.fn().mockResolvedValue([]),
 }));
+
+// Hero's background editor and the MediaIdField picker both call getMedia(). Stub the
+// module so the dialog opens without an HTTP call, and return a stable image asset so
+// the preview has something to render for the tests that set background_media_id.
+vi.mock('../../api/mediaApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/mediaApi')>();
+  return {
+    ...actual,
+    getMedia: vi.fn().mockResolvedValue([
+      {
+        id: 'm-bg',
+        s3_key: 'media/m-bg/hero.jpg',
+        url: 'https://cdn.example.com/hero.jpg',
+        mime: 'image/jpeg',
+        bytes: 4096,
+        alt: 'Hero backdrop',
+        confirmed_at: '2026-01-01T00:00:00Z',
+        unreferenced_at: null,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ]),
+  };
+});
 
 function makeSection(type: SectionType): AdminSection {
   return {
@@ -442,5 +466,283 @@ describe('SectionEditDialog — blog teaser/index mode (task #103)', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+});
+
+// Task #131. Hero gains an optional nested `background` blob for image tweaks. The editor
+// exposes a compact group of controls inside the hero dialog; controls are only usable once
+// a background media item is picked, values are persisted as numbers, and any key at its
+// default is omitted from the saved payload so the JSON stays minimal.
+describe('SectionEditDialog (task #131): hero background image tweaks', () => {
+  it('registers a hero_background field on the hero section for the "background" key', () => {
+    const hero = getSectionTypeDef('hero');
+    const bg = hero.fields.find((f) => f.key === 'background');
+    expect(bg).toBeDefined();
+    expect(bg!.kind).toBe('hero_background');
+    expect(bg!.label).toBe('Background image');
+    // Not required, so a fresh hero with no background stays saveable.
+    expect(bg!.required).toBeFalsy();
+  });
+
+  it('shows a hint (not the controls) when no background_media_id is set', () => {
+    render(
+      <SectionEditDialog
+        open
+        section={makeSection('hero')}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/pick a background media item to tune it/i)).toBeInTheDocument();
+    // None of the tune controls are rendered without a media id.
+    expect(screen.queryByRole('slider', { name: /opacity \(dark\)/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('object-position-grid')).not.toBeInTheDocument();
+    // The save is still enabled (background is optional).
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('renders the full control set (sliders, object fit, preset grid, preview) once a media item is picked', async () => {
+    render(
+      <SectionEditDialog
+        open
+        section={{ ...makeSection('hero'), data: { background_media_id: 'm-bg' } }}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Preview element with the dark/light toggle.
+    expect(screen.getByTestId('hero-background-preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /preview on dark theme/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /preview on light theme/i })).toBeInTheDocument();
+
+    // Opacity + filter + overlay sliders each with numeric input.
+    expect(screen.getByRole('slider', { name: /opacity \(dark\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /opacity \(light\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /blur \(px\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /grayscale/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /brightness/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /contrast/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /saturate/i })).toBeInTheDocument();
+    // Anchor "Scale" exactly so it doesn't also match "Grayscale".
+    expect(screen.getByRole('slider', { name: /^scale$/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /overlay \(dark\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /overlay \(light\)/i })).toBeInTheDocument();
+
+    // Object fit select and object position free-text.
+    expect(screen.getAllByText(/object fit/i).length).toBeGreaterThan(0);
+    // The preset buttons also have `object position` in their aria-labels, so anchor an
+    // exact label match to the text input's aria-label.
+    expect(screen.getByRole('textbox', { name: 'Object position' })).toBeInTheDocument();
+
+    // The 3x3 anchor preset grid with all nine buttons.
+    const grid = screen.getByTestId('object-position-grid');
+    expect(within(grid).getAllByRole('button')).toHaveLength(9);
+
+    // Preview image resolves via the mocked getMedia() response.
+    await waitFor(() => {
+      expect(screen.getByTestId('hero-background-preview-image')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/hero.jpg',
+      );
+    });
+  });
+
+  it('a fresh hero with a media id but no tweaks saves without a background key (defaults omitted)', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={{ ...makeSection('hero'), data: { background_media_id: 'm-bg' } }}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const saved = onSave.mock.calls[0][0] as Record<string, unknown>;
+    expect(saved).toMatchObject({ background_media_id: 'm-bg' });
+    expect('background' in saved).toBe(false);
+  });
+
+  it('typing a numeric value persists as a number and omits keys at their default', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={{ ...makeSection('hero'), data: { background_media_id: 'm-bg' } }}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Bump opacity (dark) to 0.4 via the numeric input.
+    const darkOpacity = screen.getByRole('spinbutton', { name: /opacity \(dark\) value/i });
+    await user.clear(darkOpacity);
+    await user.type(darkOpacity, '0.4');
+    // Bump blur to 6px.
+    const blur = screen.getByRole('spinbutton', { name: /blur \(px\) value/i });
+    await user.clear(blur);
+    await user.type(blur, '6');
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const saved = onSave.mock.calls[0][0] as { background?: HeroBackground };
+    expect(saved.background).toBeDefined();
+    // Numbers land as numbers (never as "0.4" strings).
+    expect(saved.background!.opacity_dark).toBe(0.4);
+    expect(typeof saved.background!.opacity_dark).toBe('number');
+    expect(saved.background!.blur_px).toBe(6);
+    expect(typeof saved.background!.blur_px).toBe('number');
+    // Untouched keys still at their defaults are OMITTED, not sent as-is.
+    expect(saved.background).not.toHaveProperty('opacity_light');
+    expect(saved.background).not.toHaveProperty('brightness');
+    expect(saved.background).not.toHaveProperty('scale');
+    expect(saved.background).not.toHaveProperty('object_fit');
+  });
+
+  it('re-typing the default value drops the key from the saved payload', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    // Start with a non-default opacity_dark; the user edits it back to the default 0.1.
+    render(
+      <SectionEditDialog
+        open
+        section={{
+          ...makeSection('hero'),
+          data: {
+            background_media_id: 'm-bg',
+            background: { opacity_dark: 0.5, blur_px: 8 },
+          },
+        }}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const darkOpacity = screen.getByRole('spinbutton', { name: /opacity \(dark\) value/i });
+    await user.clear(darkOpacity);
+    await user.type(darkOpacity, String(HERO_BACKGROUND_DEFAULTS.opacity_dark));
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const saved = onSave.mock.calls[0][0] as { background?: HeroBackground };
+    // opacity_dark went back to its default → omitted; blur_px is still non-default → kept.
+    expect(saved.background).toBeDefined();
+    expect(saved.background).not.toHaveProperty('opacity_dark');
+    expect(saved.background!.blur_px).toBe(8);
+  });
+
+  it('clicking a preset button in the 3x3 anchor grid writes the matching object_position', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={{ ...makeSection('hero'), data: { background_media_id: 'm-bg' } }}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // "top left" preset writes "0% 0%".
+    await user.click(screen.getByRole('button', { name: /set object position to top left/i }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const saved = onSave.mock.calls[0][0] as { background?: HeroBackground };
+    expect(saved.background?.object_position).toBe('0% 0%');
+  });
+
+  it('clicking the "center" preset (the default value) omits object_position from the payload', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={{
+          ...makeSection('hero'),
+          data: {
+            background_media_id: 'm-bg',
+            background: { object_position: '100% 0%' },
+          },
+        }}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /set object position to center$/i }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const saved = onSave.mock.calls[0][0] as { background?: HeroBackground };
+    // "center" == "50% 50%" which is the default, so the key is dropped entirely, and
+    // (since it was the only non-default key) so is the whole `background` object.
+    expect(
+      saved.background === undefined || !('object_position' in (saved.background ?? {})),
+    ).toBe(true);
+  });
+
+  it('saves the full expected payload shape (numbers only, defaults omitted)', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <SectionEditDialog
+        open
+        section={{
+          ...makeSection('hero'),
+          data: {
+            title: 'Home',
+            background_media_id: 'm-bg',
+            background: {
+              opacity_dark: 0.25,
+              blur_px: 4,
+              object_position: '25% 75%',
+              object_fit: 'contain',
+              // A default-valued key seeded in: pruning must still drop it on save.
+              brightness: 1,
+            },
+          },
+        }}
+        saving={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Nudge contrast so the pruning of the seeded-default `brightness: 1` gets exercised.
+    const contrastInput = screen.getByRole('spinbutton', { name: /contrast value/i });
+    await user.clear(contrastInput);
+    await user.type(contrastInput, '1.2');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const saved = onSave.mock.calls[0][0] as {
+      title?: string;
+      background_media_id?: string;
+      background?: HeroBackground;
+    };
+    expect(saved.title).toBe('Home');
+    expect(saved.background_media_id).toBe('m-bg');
+    expect(saved.background).toEqual({
+      opacity_dark: 0.25,
+      blur_px: 4,
+      object_position: '25% 75%',
+      object_fit: 'contain',
+      contrast: 1.2,
+    });
+    for (const key of ['opacity_dark', 'blur_px', 'contrast'] as const) {
+      expect(typeof (saved.background as Record<string, unknown>)[key]).toBe('number');
+    }
   });
 });

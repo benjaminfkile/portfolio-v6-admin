@@ -6,7 +6,7 @@
  */
 import { FormControlLabel, MenuItem, Switch, TextField } from '@mui/material';
 import type { FieldDef } from '../../lib/sectionRegistry';
-import type { Link } from '../../types/content';
+import type { HeroBackground, Link } from '../../types/content';
 import LinkEditor from './LinkEditor';
 import StringListField from './StringListField';
 import SkillRefsField from './SkillRefsField';
@@ -14,6 +14,7 @@ import PostRefsField from './PostRefsField';
 import MediaIdField from './MediaIdField';
 import IconSourceField from './IconSourceField';
 import BlogSlugField from './BlogSlugField';
+import HeroBackgroundField from './HeroBackgroundField';
 
 interface FieldRendererProps {
   field: FieldDef;
@@ -165,6 +166,17 @@ export default function FieldRenderer({ field, value, data, onChange }: FieldRen
           lightIconUrl={
             field.lightSourceKey ? (data?.[field.lightSourceKey] as string | undefined) : undefined
           }
+        />
+      );
+
+    case 'hero_background':
+      return (
+        <HeroBackgroundField
+          label={field.label}
+          value={value as HeroBackground | undefined}
+          mediaId={data?.background_media_id as string | undefined}
+          onChange={(next) => set(next)}
+          helperText={field.helperText}
         />
       );
 
