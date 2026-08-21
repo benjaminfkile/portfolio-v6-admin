@@ -61,6 +61,7 @@ function metadataOf(post: Post): PostMetadataValue {
     tags: post.tags,
     cover_media_id: post.cover_media_id,
     blog_id: post.blog_id,
+    published_at: post.published_at,
   };
 }
 
@@ -79,6 +80,7 @@ export default function PostEditorPage() {
     tags: [],
     cover_media_id: null,
     blog_id: null,
+    published_at: null,
   });
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [baseline, setBaseline] = useState('');
@@ -137,6 +139,7 @@ export default function PostEditorPage() {
         tags: metadata.tags,
         cover_media_id: metadata.cover_media_id,
         blog_id: metadata.blog_id,
+        published_at: metadata.published_at,
         draft_body: blocks,
         expected_updated_at: post.updated_at,
       });

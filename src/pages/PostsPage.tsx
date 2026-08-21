@@ -52,8 +52,19 @@ export default function PostsPage() {
         // The filter is a convenience; a failed blog list must not break the posts list.
         getBlogs().catch(() => [] as Blog[]),
       ]);
-      // Most recently updated first; a stable, predictable ordering for the list.
-      setPosts([...postData].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+      // Newest published first; drafts (null published_at) sort after every dated post,
+      // then fall back to most-recently-updated so recent draft edits stay near the top
+      // of that trailing block (task #134).
+      setPosts(
+        [...postData].sort((a, b) => {
+          if (a.published_at && b.published_at) {
+            return b.published_at.localeCompare(a.published_at);
+          }
+          if (a.published_at) return -1;
+          if (b.published_at) return 1;
+          return b.updated_at.localeCompare(a.updated_at);
+        }),
+      );
       setBlogs(blogData);
     } catch (err) {
       setLoadError(serverMessage(err, 'Could not load posts. Is the API reachable?'));
@@ -193,8 +204,9 @@ export default function PostsPage() {
                     variant="caption"
                     color="text.secondary"
                     sx={{ minWidth: 96, textAlign: 'right' }}
+                    data-testid="post-published-at"
                   >
-                    {published && post.published_at ? formatDate(post.published_at) : '—'}
+                    {post.published_at ? formatDate(post.published_at) : 'Draft'}
                   </Typography>
                 </Stack>
               </Paper>
