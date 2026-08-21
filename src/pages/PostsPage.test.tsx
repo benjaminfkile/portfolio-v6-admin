@@ -79,7 +79,7 @@ function renderPage() {
   );
 }
 
-describe('PostsPage — published_at column and sort (task #134)', () => {
+describe('PostsPage, published_at column and sort (task #134)', () => {
   it('sorts posts by published_at desc; drafts fall to the end by most-recently-updated', async () => {
     vi.mocked(postsApi.getPosts).mockResolvedValue([oldPublished, draftOld, newPublished, draftRecent]);
     renderPage();

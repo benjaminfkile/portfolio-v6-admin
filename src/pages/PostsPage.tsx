@@ -1,5 +1,5 @@
 /**
- * Posts list page (§3.6, §4.2, Blogs v1.13). Lists every post — drafts included — with a
+ * Posts list page (§3.6, §4.2, Blogs v1.13). Lists every post, drafts included, with a
  * draft/published status chip, its blog (as a chip), and the `published_at` date, plus a
  * create flow. A blog filter select narrows the list to one blog (or the unassigned posts).
  * Creating a post opens the block editor for it; clicking a row opens it for editing.

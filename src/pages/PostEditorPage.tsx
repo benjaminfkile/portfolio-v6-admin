@@ -2,14 +2,14 @@
  * Post editor page (§3.6, §3.7, §4.2, §4.5, §8.3). Loads one post, holds its metadata and
  * `Block[]` body in memory, and drives the three lifecycle actions:
  *
- *  - **Save** — a wholesale `PATCH` of the metadata and `draft_body` array carrying
+ *  - **Save**, a wholesale `PATCH` of the metadata and `draft_body` array carrying
  *    `expected_updated_at`; a 409 raises the shared "changed since you loaded it" dialog
  *    (§4.5), identical to the sections flow.
- *  - **Publish / Unpublish** — confirm-gated `POST`s. Publish re-validates server-side and
+ *  - **Publish / Unpublish**, confirm-gated `POST`s. Publish re-validates server-side and
  *    surfaces any validation failure clearly (§3.9 item 3) rather than as an opaque toast.
  *
  * The slug locks in the metadata editor once the post has been published at least once
- * (`published_body` is non-null even after unpublish — §3.6).
+ * (`published_body` is non-null even after unpublish, §3.6).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -118,7 +118,7 @@ export default function PostEditorPage() {
     void load();
   }, [load]);
 
-  // Slug locks once the post has ever been published — published_body survives unpublish (§3.6).
+  // Slug locks once the post has ever been published, published_body survives unpublish (§3.6).
   const slugLocked = post?.published_body != null;
   const isPublished = post?.published_at != null;
 
@@ -133,7 +133,7 @@ export default function PostEditorPage() {
     try {
       const updated = await updatePost(post.id, {
         title: metadata.title,
-        // Omit the slug once locked — it must be impossible to change after publish (§3.6).
+        // Omit the slug once locked, it must be impossible to change after publish (§3.6).
         ...(slugLocked ? {} : { slug: metadata.slug }),
         excerpt: metadata.excerpt,
         tags: metadata.tags,

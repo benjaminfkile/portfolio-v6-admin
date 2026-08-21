@@ -3,7 +3,7 @@
  * envelope (§4.3) and returns just the payload.
  *
  * The block body is written **wholesale** via `PATCH /api/admin/posts/:id` with a complete
- * `draft_body` array — blocks are not individually addressable endpoints (§4.2). Like
+ * `draft_body` array, blocks are not individually addressable endpoints (§4.2). Like
  * sections, metadata/body PATCHes carry the optimistic-concurrency precondition
  * `expected_updated_at` (§4.5); a 409 becomes the shared {@link ConflictError} so the UI can
  * raise the same "changed since you loaded it" refetch dialog.
@@ -56,7 +56,7 @@ export class PostValidationError extends Error {
   }
 }
 
-/** Payload for creating a post — only the identifying metadata; body starts empty (§3.6). */
+/** Payload for creating a post, only the identifying metadata; body starts empty (§3.6). */
 export interface CreatePostPayload {
   title: string;
   slug: string;
@@ -64,7 +64,7 @@ export interface CreatePostPayload {
 
 /**
  * Payload for `PATCH /api/admin/posts/:id`. Any subset of metadata plus the wholesale
- * `draft_body`; `expected_updated_at` is **required** — an unconditional overwrite must be
+ * `draft_body`; `expected_updated_at` is **required**, an unconditional overwrite must be
  * impossible to express (§4.5).
  */
 export interface UpdatePostPayload {
@@ -87,24 +87,24 @@ export interface UpdatePostPayload {
 
 // ---- Reads -----------------------------------------------------------------
 
-/** GET /api/admin/posts — all posts, drafts included (§4.2). */
+/** GET /api/admin/posts, all posts, drafts included (§4.2). */
 export async function getPosts(): Promise<Post[]> {
   return unwrap<{ posts: Post[] }>(await apiClient.get('/api/admin/posts')).posts;
 }
 
-/** GET /api/admin/posts/:id — one post with its `draft_body` (§4.2). */
+/** GET /api/admin/posts/:id, one post with its `draft_body` (§4.2). */
 export async function getPost(id: string): Promise<Post> {
   return unwrap<Post>(await apiClient.get(`/api/admin/posts/${id}`));
 }
 
 // ---- Writes ----------------------------------------------------------------
 
-/** POST /api/admin/posts — create a post from title + slug. */
+/** POST /api/admin/posts, create a post from title + slug. */
 export async function createPost(payload: CreatePostPayload): Promise<Post> {
   return unwrap<Post>(await apiClient.post('/api/admin/posts', payload));
 }
 
-/** PATCH /api/admin/posts/:id — wholesale metadata/`draft_body` update (409 on conflict). */
+/** PATCH /api/admin/posts/:id, wholesale metadata/`draft_body` update (409 on conflict). */
 export async function updatePost(id: string, payload: UpdatePostPayload): Promise<Post> {
   try {
     return unwrap<Post>(await apiClient.patch(`/api/admin/posts/${id}`, payload));
@@ -113,13 +113,13 @@ export async function updatePost(id: string, payload: UpdatePostPayload): Promis
   }
 }
 
-/** DELETE /api/admin/posts/:id — delete a post. */
+/** DELETE /api/admin/posts/:id, delete a post. */
 export async function deletePost(id: string): Promise<void> {
   await apiClient.delete(`/api/admin/posts/${id}`);
 }
 
 /**
- * POST /api/admin/posts/:id/publish — validate + `published_body := draft_body` (§3.6).
+ * POST /api/admin/posts/:id/publish, validate + `published_body := draft_body` (§3.6).
  * A validation refusal surfaces as {@link PostValidationError}; everything else re-throws.
  */
 export async function publishPost(id: string): Promise<Post> {
@@ -130,7 +130,7 @@ export async function publishPost(id: string): Promise<Post> {
   }
 }
 
-/** POST /api/admin/posts/:id/unpublish — null `published_at`, retain `published_body` (§3.6). */
+/** POST /api/admin/posts/:id/unpublish, null `published_at`, retain `published_body` (§3.6). */
 export async function unpublishPost(id: string): Promise<Post> {
   return unwrap<Post>(await apiClient.post(`/api/admin/posts/${id}/unpublish`, {}));
 }

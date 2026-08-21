@@ -39,7 +39,7 @@ function slugInput(): HTMLInputElement {
   return screen.getByRole('textbox', { name: /slug/i }) as HTMLInputElement;
 }
 
-describe('PostMetadataEditor — slug lock after first publish (§3.6)', () => {
+describe('PostMetadataEditor, slug lock after first publish (§3.6)', () => {
   it('slug is editable before first publish', () => {
     render(<PostMetadataEditor value={value} onChange={vi.fn()} slugLocked={false} />);
     expect(slugInput()).not.toBeDisabled();
@@ -54,7 +54,7 @@ describe('PostMetadataEditor — slug lock after first publish (§3.6)', () => {
   });
 });
 
-describe('PostMetadataEditor — fields', () => {
+describe('PostMetadataEditor, fields', () => {
   it('renders title, excerpt, tags, and a cover picker', () => {
     render(<PostMetadataEditor value={value} onChange={vi.fn()} slugLocked={false} />);
     expect(screen.getByRole('textbox', { name: /title/i })).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe('PostMetadataEditor — fields', () => {
   });
 });
 
-describe('PostMetadataEditor — blog select (Blogs v1.13)', () => {
+describe('PostMetadataEditor, blog select (Blogs v1.13)', () => {
   it('populates the select from GET /api/admin/blogs with a "No blog" option', async () => {
     render(<PostMetadataEditor value={value} onChange={vi.fn()} slugLocked={false} />);
     await waitFor(() => expect(blogsApi.getBlogs).toHaveBeenCalled());

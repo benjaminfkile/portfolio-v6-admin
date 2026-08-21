@@ -66,7 +66,7 @@ function renderAt(id: string) {
   );
 }
 
-describe('PostEditorPage — Published on wiring (task #134)', () => {
+describe('PostEditorPage, Published on wiring (task #134)', () => {
   it('prefills the Published on control from post.published_at', async () => {
     vi.mocked(postsApi.getPost).mockResolvedValue(publishedPost);
     renderAt('p2');

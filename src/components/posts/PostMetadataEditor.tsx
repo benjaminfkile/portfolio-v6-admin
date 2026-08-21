@@ -1,6 +1,6 @@
 /**
  * Post metadata editor (§3.6, Blogs v1.13): title, slug, excerpt, blog, tags, and cover media.
- * The slug is **freely editable until first publish, then locked** (§3.6) — once locked the
+ * The slug is **freely editable until first publish, then locked** (§3.6), once locked the
  * field is disabled and carries an explanatory tooltip, because changing it breaks every
  * inbound link. Cover selection reuses {@link MediaIdField} → the shared MediaPicker.
  *
@@ -36,7 +36,7 @@ export interface PostMetadataValue {
 interface PostMetadataEditorProps {
   value: PostMetadataValue;
   onChange: (value: PostMetadataValue) => void;
-  /** True once the post has been published at least once — slug is locked (§3.6). */
+  /** True once the post has been published at least once, slug is locked (§3.6). */
   slugLocked: boolean;
 }
 
@@ -44,7 +44,7 @@ const SLUG_LOCK_TOOLTIP =
   'The slug is locked because this post has been published. Changing it would break every ' +
   'inbound link, so it is fixed after first publish (§3.6).';
 
-/** Sentinel value for the "No blog" option — MUI selects cannot hold a real `null`. */
+/** Sentinel value for the "No blog" option, MUI selects cannot hold a real `null`. */
 const NO_BLOG = '';
 
 /**
@@ -129,7 +129,7 @@ export default function PostMetadataEditor({
           error={!slugLocked && !value.slug.trim()}
           helperText={
             slugLocked
-              ? 'Locked after first publish — changing it would break inbound links.'
+              ? 'Locked after first publish, changing it would break inbound links.'
               : 'The URL segment (/blog/your-slug). Editable until the post is first published.'
           }
           slotProps={{
