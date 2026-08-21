@@ -7,8 +7,8 @@ post + block editor, the media library, preview, publishing, version history/res
 integrations (Spotify/GitHub/Duolingo + API keys), analytics, and the Agents page for
 mint→hand-off→revoke API-key sessions with AI editing agents.
 
-Deploys to Vercel as `portfolio-v6-admin-dev` (production branch `dev`) and
-`portfolio-v6-admin-prod` (production branch `main`, portfolio-v6-admin-prod.vercel.app).
+Deploys to Vercel as `portfolio-v6-admin-prod` (production branch `main`,
+portfolio-v6-admin-prod.vercel.app).
 The authoritative spec is `TECH_SPEC_V1.md` in the `portfolio-v6` repo; section references
 below (e.g. §4.2) point into it.
 
@@ -63,8 +63,8 @@ Copy `.env.example` to `.env.local` and fill in:
 
 | Variable | Purpose |
 |---|---|
-| `VITE_API_BASE_URL` | API origin. **Empty locally** so requests are same-origin and the Vite dev proxy (§10) forwards `/api`; the gateway origin (`https://api.benkile.com/portfolio-v6-api[-dev]`) in deployed environments. |
-| `VITE_COGNITO_USER_POOL_ID` | Cognito user pool id (prod vs dev pool per environment). |
+| `VITE_API_BASE_URL` | API origin. **Empty locally** so requests are same-origin and the Vite dev proxy (§10) forwards `/api`; the gateway origin (`https://api.benkile.com/portfolio-v6-api`) when deployed. |
+| `VITE_COGNITO_USER_POOL_ID` | Cognito user pool id (`portfolio-v6-admin-up`). |
 | `VITE_COGNITO_CLIENT_ID` | Cognito app client id (public SPA client — **no** client secret). The region is derived from the pool id — there is no region variable. |
 | `VITE_PUBLIC_SITE_URL` | Public-site hostname; the preview-iframe target (§7). Becomes `https://benkile.com` at cutover — the only value that changes when the apex is swapped. |
 | `VITE_CDN_URL` | Optional CDN base for media thumbnails (§6.8). Used only when the media list does not already return a resolved `url`; leave empty to fall back to the raw `s3_key`. |
@@ -74,8 +74,8 @@ deployment protection and ships `robots.txt` with `Disallow: /` (§9.6).
 
 ## Local development (§10)
 
-Run the API locally against the **dev** database and **dev** Cognito pool — do not iterate by
-deploying (an API deploy triggers a ~7-minute ASG instance refresh, §10). The three repos run
+Run the API locally against a local Postgres database (`portfolio_v6_local`, see the API repo's
+`.env.example`); do not iterate by deploying (an API deploy triggers a ~7-minute ASG instance refresh, §10). The three repos run
 side by side:
 
 ```
