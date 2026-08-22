@@ -175,6 +175,7 @@ export default function FieldRenderer({ field, value, data, onChange }: FieldRen
           label={field.label}
           value={value as HeroBackground | undefined}
           mediaId={data?.background_media_id as string | undefined}
+          lightMediaId={data?.background_light_media_id as string | undefined}
           onChange={(next) => set(next)}
           helperText={field.helperText}
         />

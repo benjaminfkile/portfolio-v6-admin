@@ -100,6 +100,11 @@ interface HeroBackgroundFieldProps {
   /** Sibling `background_media_id` from the hero data (drives visibility). */
   mediaId: string | undefined;
   /**
+   * Sibling `background_light_media_id`. When set, the light preview shows this
+   * image instead of `mediaId` (matching what the site renders on its light theme).
+   */
+  lightMediaId?: string | undefined;
+  /**
    * Emits the next `background` object, or `undefined` when every key is at its default
    * (the parent then drops the key from the saved data blob).
    */
@@ -175,11 +180,13 @@ export default function HeroBackgroundField({
   label,
   value,
   mediaId,
+  lightMediaId,
   onChange,
   helperText,
 }: HeroBackgroundFieldProps) {
   const [previewMode, setPreviewMode] = useState<'dark' | 'light'>('dark');
   const [asset, setAsset] = useState<MediaAsset | null>(null);
+  const [lightAsset, setLightAsset] = useState<MediaAsset | null>(null);
   const [assetError, setAssetError] = useState('');
   // Local text buffer for object_position so the user can type an intermediate value
   // (e.g. "50" en route to "50% 30%") without the parent immediately rejecting it.
@@ -195,6 +202,7 @@ export default function HeroBackgroundField({
   useEffect(() => {
     if (!mediaId) {
       setAsset(null);
+      setLightAsset(null);
       setAssetError('');
       return;
     }
@@ -205,6 +213,9 @@ export default function HeroBackgroundField({
         if (!alive) return;
         const found = assets.find((a) => a.id === mediaId) ?? null;
         setAsset(found);
+        setLightAsset(
+          lightMediaId ? (assets.find((a) => a.id === lightMediaId) ?? null) : null,
+        );
       })
       .catch(() => {
         if (alive) setAssetError('Could not load the background preview.');
@@ -212,7 +223,7 @@ export default function HeroBackgroundField({
     return () => {
       alive = false;
     };
-  }, [mediaId]);
+  }, [mediaId, lightMediaId]);
 
   const current = value ?? {};
   const eff = effective(value);
@@ -274,7 +285,9 @@ export default function HeroBackgroundField({
   }
 
   const positionValid = isValidObjectPosition(positionDraft);
-  const imageSrc = asset && isImage(asset) ? mediaUrl(asset) : null;
+  // Light preview uses the light-theme image when one is picked (site parity).
+  const previewAsset = previewMode === 'light' && lightAsset ? lightAsset : asset;
+  const imageSrc = previewAsset && isImage(previewAsset) ? mediaUrl(previewAsset) : null;
 
   return (
     <Box>

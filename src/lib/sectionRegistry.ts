@@ -97,6 +97,14 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       { key: 'tagline', label: 'Tagline', kind: 'text' },
       { key: 'background_media_id', label: 'Background media', kind: 'media' },
       {
+        key: 'background_light_media_id',
+        label: 'Background media (light theme)',
+        kind: 'media',
+        helperText:
+          'Optional. Shown instead of the background media when the site is in its light ' +
+          'theme. Leave empty to use the same image on both themes.',
+      },
+      {
         key: 'background',
         label: 'Background image',
         kind: 'hero_background',

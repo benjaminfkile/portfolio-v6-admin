@@ -33,6 +33,17 @@ vi.mock('../../api/mediaApi', async (importOriginal) => {
         unreferenced_at: null,
         created_at: '2026-01-01T00:00:00Z',
       },
+      {
+        id: 'm-bg-light',
+        s3_key: 'media/m-bg-light/hero-light.jpg',
+        url: 'https://cdn.example.com/hero-light.jpg',
+        mime: 'image/jpeg',
+        bytes: 4096,
+        alt: 'Hero backdrop (light)',
+        confirmed_at: '2026-01-01T00:00:00Z',
+        unreferenced_at: null,
+        created_at: '2026-01-01T00:00:00Z',
+      },
     ]),
   };
 });
@@ -501,6 +512,41 @@ describe('SectionEditDialog (task #131): hero background image tweaks', () => {
     expect(screen.queryByTestId('object-position-grid')).not.toBeInTheDocument();
     // The save is still enabled (background is optional).
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('registers an optional light-theme background media field on the hero section', () => {
+    const field = getSectionTypeDef('hero').fields.find((f) => f.key === 'background_light_media_id');
+    expect(field).toBeDefined();
+    expect(field!.kind).toBe('media');
+  });
+
+  it('previews the light-theme image on the light toggle when background_light_media_id is set', async () => {
+    render(
+      <SectionEditDialog
+        open
+        section={{
+          ...makeSection('hero'),
+          data: { background_media_id: 'm-bg', background_light_media_id: 'm-bg-light' },
+        }}
+        saving={false}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('hero-background-preview-image')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/hero.jpg',
+      ),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /preview on light theme/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId('hero-background-preview-image')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/hero-light.jpg',
+      ),
+    );
   });
 
   it('renders the full control set (sliders, object fit, preset grid, preview) once a media item is picked', async () => {
