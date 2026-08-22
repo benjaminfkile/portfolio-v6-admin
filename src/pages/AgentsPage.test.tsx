@@ -124,7 +124,7 @@ describe('agentPrompt template', () => {
 
   it('includes the required section headers verbatim', () => {
     const out = buildAgentPrompt('https://example.test/api');
-    expect(out).toContain('# Portfolio v6 API — agent guide');
+    expect(out).toContain('# Portfolio v6 API: agent guide');
     expect(out).toContain('## Conventions');
     expect(out).toContain('## Content model');
     expect(out).toContain('## Endpoints available to your key');
@@ -165,7 +165,7 @@ describe('AgentsPage — copy button', () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const written = writeText.mock.calls[0][0] as string;
-    expect(written).toContain('# Portfolio v6 API — agent guide');
+    expect(written).toContain('# Portfolio v6 API: agent guide');
     expect(written).toContain('Base URL: ');
 
     // The button flips to Copied.
