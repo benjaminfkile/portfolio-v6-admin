@@ -90,6 +90,8 @@ export interface HeroData {
   title: string;
   tagline?: string;
   background_media_id?: string;
+  /** Optional light-theme replacement for background_media_id (absent = same image on both). */
+  background_light_media_id?: string;
   background?: HeroBackground;
 }
 
