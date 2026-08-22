@@ -28,6 +28,7 @@ Auth: send \`Authorization: Bearer <API_KEY>\` on every /api/admin request (the 
 - Every PATCH requires \`expected_updated_at\` set to the \`updated_at\` you last read. 400 if missing, 409 if stale. On 409, re-GET the resource and re-apply your change.
 - 401 = invalid/revoked key OR an admin-only route; 404 = unknown id/slug; 400 = validation failure (errorMsg lists the issues).
 - GET /api/schema (public) returns the JSON Schema for every content shape: section \`data\` per type, item shapes per type, the post block model, page, and blog. Consult it before constructing any body. Do not guess field names; unknown keys are rejected.
+- Write bodies for sections and items wrap the content: POST/PATCH a section sends {type, page_id, data: {...}, is_hidden?} and an item sends {data: {...}, is_hidden?}. Posting bare fields creates an EMPTY draft record (drafts accept it), so always nest under `data`. Pages, posts, and blogs take their fields at the top level.
 - Drafts are lenient, publishing is strict: section \`data\` and items may be saved partially filled, but POST /api/admin/publish validates everything against the canonical schema and returns 400 listing what is incomplete.
 
 ## Content model
