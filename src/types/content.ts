@@ -90,7 +90,7 @@ export interface HeroData {
   title: string;
   tagline?: string;
   background_media_id?: string;
-  /** Optional light-theme replacement for background_media_id (absent = same image on both). */
+  /** Light-theme backdrop; background_media_id is the dark-theme one. Each optional and independent. */
   background_light_media_id?: string;
   background?: HeroBackground;
 }

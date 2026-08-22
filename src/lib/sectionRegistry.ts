@@ -95,14 +95,19 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
       // substitutes fallback copy for it.
       { key: 'title', label: 'Title', kind: 'text' },
       { key: 'tagline', label: 'Tagline', kind: 'text' },
-      { key: 'background_media_id', label: 'Background media', kind: 'media' },
+      {
+        key: 'background_media_id',
+        label: 'Background media (dark theme)',
+        kind: 'media',
+        helperText:
+          'Optional. Shown behind the hero on the dark theme only. Pick the same item ' +
+          'for both themes to share one image; leave both empty for no backdrop.',
+      },
       {
         key: 'background_light_media_id',
         label: 'Background media (light theme)',
         kind: 'media',
-        helperText:
-          'Optional. Shown instead of the background media when the site is in its light ' +
-          'theme. Leave empty to use the same image on both themes.',
+        helperText: 'Optional. Shown behind the hero on the light theme only.',
       },
       {
         key: 'background',
@@ -110,7 +115,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
         kind: 'hero_background',
         helperText:
           'Tune how the background image sits behind the hero. Only visible once a ' +
-          'background media item is picked. Values left at their defaults are omitted ' +
+          'dark or light background media item is picked. Values left at their defaults are omitted ' +
           'from the saved payload.',
       },
     ],

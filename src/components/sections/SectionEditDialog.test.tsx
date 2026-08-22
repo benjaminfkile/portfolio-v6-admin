@@ -506,7 +506,9 @@ describe('SectionEditDialog (task #131): hero background image tweaks', () => {
       />,
     );
 
-    expect(screen.getByText(/pick a background media item to tune it/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/pick a dark and\/or light background media item to tune it/i),
+    ).toBeInTheDocument();
     // None of the tune controls are rendered without a media id.
     expect(screen.queryByRole('slider', { name: /opacity \(dark\)/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('object-position-grid')).not.toBeInTheDocument();

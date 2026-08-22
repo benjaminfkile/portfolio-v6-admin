@@ -97,12 +97,9 @@ interface HeroBackgroundFieldProps {
   label: string;
   /** Current `background` blob from the hero data (or undefined). */
   value: HeroBackground | undefined;
-  /** Sibling `background_media_id` from the hero data (drives visibility). */
+  /** Sibling `background_media_id` (the dark-theme image) from the hero data. */
   mediaId: string | undefined;
-  /**
-   * Sibling `background_light_media_id`. When set, the light preview shows this
-   * image instead of `mediaId` (matching what the site renders on its light theme).
-   */
+  /** Sibling `background_light_media_id` (the light-theme image). */
   lightMediaId?: string | undefined;
   /**
    * Emits the next `background` object, or `undefined` when every key is at its default
@@ -200,7 +197,7 @@ export default function HeroBackgroundField({
   }, [value?.object_position]);
 
   useEffect(() => {
-    if (!mediaId) {
+    if (!mediaId && !lightMediaId) {
       setAsset(null);
       setLightAsset(null);
       setAssetError('');
@@ -211,8 +208,7 @@ export default function HeroBackgroundField({
     getMedia()
       .then((assets) => {
         if (!alive) return;
-        const found = assets.find((a) => a.id === mediaId) ?? null;
-        setAsset(found);
+        setAsset(mediaId ? (assets.find((a) => a.id === mediaId) ?? null) : null);
         setLightAsset(
           lightMediaId ? (assets.find((a) => a.id === lightMediaId) ?? null) : null,
         );
@@ -271,22 +267,24 @@ export default function HeroBackgroundField({
     [eff.blur_px, eff.grayscale, eff.brightness, eff.contrast, eff.saturate],
   );
 
-  if (!mediaId) {
+  if (!mediaId && !lightMediaId) {
     return (
       <Box>
         <Typography variant="subtitle2" gutterBottom>
           {label}
         </Typography>
         <Alert severity="info" variant="outlined">
-          Pick a background media item to tune it.
+          Pick a dark and/or light background media item to tune it.
         </Alert>
       </Box>
     );
   }
 
   const positionValid = isValidObjectPosition(positionDraft);
-  // Light preview uses the light-theme image when one is picked (site parity).
-  const previewAsset = previewMode === 'light' && lightAsset ? lightAsset : asset;
+  // Each theme previews its own image (site parity); a theme with no image
+  // picked previews empty.
+  const previewId = previewMode === 'light' ? lightMediaId : mediaId;
+  const previewAsset = previewMode === 'light' ? lightAsset : asset;
   const imageSrc = previewAsset && isImage(previewAsset) ? mediaUrl(previewAsset) : null;
 
   return (
@@ -366,7 +364,7 @@ export default function HeroBackgroundField({
               typography: 'caption',
             }}
           >
-            {assetError || 'Loading preview...'}
+            {assetError || (previewId ? 'Loading preview...' : 'No image for this theme')}
           </Box>
         )}
       </Box>
